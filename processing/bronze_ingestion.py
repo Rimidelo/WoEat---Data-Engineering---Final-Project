@@ -42,12 +42,16 @@ class BronzeIngestion:
                 col("data.customer_id"),
                 col("data.restaurant_id"),
                 col("data.driver_id"),
-                col("data.items"),
                 to_timestamp(col("data.order_timestamp")).alias("order_time"),
                 col("data.order_status").alias("status"),
                 when(col("data.delivery_timestamp").isNotNull(), 
                      to_timestamp(col("data.delivery_timestamp"))).alias("delivery_time"),
-                current_timestamp().alias("ingest_timestamp"),
+                col("data.total_amount").cast("float"),
+                when(col("data.prep_start_timestamp").isNotNull(),
+                     to_timestamp(col("data.prep_start_timestamp"))).alias("prep_start_time"),
+                when(col("data.prep_end_timestamp").isNotNull(),
+                     to_timestamp(col("data.prep_end_timestamp"))).alias("prep_end_time"),
+                col("data.tip_amount").cast("float"),
                 col("kafka_timestamp")
             )
         )
@@ -65,6 +69,54 @@ class BronzeIngestion:
         )
         
         print("✅ Orders stream ingestion started")
+        return query
+
+    def ingest_order_items_stream(self):
+        """Ingest real-time order items from Kafka"""
+        print("🔄 Starting order items stream ingestion...")
+        
+        # Read from Kafka
+        order_items_stream = (
+            self.spark
+            .readStream
+            .format("kafka")
+            .option("kafka.bootstrap.servers", "kafka:29092")
+            .option("subscribe", "order-items-topic")
+            .option("startingOffsets", "latest")
+            .load()
+        )
+        
+        # Parse JSON and extract order items data
+        order_items_parsed = (
+            order_items_stream
+            .select(
+                col("key").cast("string").alias("order_item_id"),
+                from_json(col("value").cast("string"), self._get_order_items_schema()).alias("data"),
+                col("timestamp").alias("kafka_timestamp")
+            )
+            .select(
+                col("data.order_item_id"),
+                col("data.order_id"),
+                col("data.item_id"),
+                col("data.quantity").cast("int"),
+                col("data.item_price").cast("float"),
+                to_timestamp(col("data.order_time")).alias("order_time")
+            )
+        )
+        
+        # Write to Bronze Iceberg table
+        query = (
+            order_items_parsed
+            .writeStream
+            .format("iceberg")
+            .outputMode("append")
+            .option("path", "demo.bronze.bronze_order_items")
+            .option("checkpointLocation", "/tmp/checkpoints/bronze_order_items")
+            .trigger(processingTime="30 seconds")
+            .start()
+        )
+        
+        print("✅ Order items stream ingestion started")
         return query
     
     def ingest_driver_locations_stream(self):
@@ -97,8 +149,7 @@ class BronzeIngestion:
                 col("data.latitude"),
                 col("data.longitude"),
                 col("data.status"),
-                col("data.speed"),
-                current_timestamp().alias("ingest_timestamp")
+                col("data.speed")
             )
         )
         
@@ -127,10 +178,13 @@ class BronzeIngestion:
         # 2. Ingest Drivers (batch)
         self._ingest_drivers()
         
-        # 3. Ingest Restaurant Performance (late-arriving batch)
-        self._ingest_restaurant_performance()
+        # 3. Ingest Restaurants (batch)
+        self._ingest_restaurants()
         
-        # 4. Ingest Weather Data (external API simulation)
+        # 4. Ingest Ratings (batch)
+        self._ingest_ratings()
+        
+        # 5. Ingest Weather Data (external API simulation)
         self._ingest_weather_data()
         
         print("✅ Batch data ingestion completed")
@@ -164,10 +218,7 @@ class BronzeIngestion:
             StructField("base_price", FloatType(), False)
         ])
         
-        menu_df = (
-            self.spark.createDataFrame(menu_data, schema)
-            .withColumn("ingest_timestamp", current_timestamp())
-        )
+        menu_df = self.spark.createDataFrame(menu_data, schema)
         
         # Write to Bronze Iceberg table
         menu_df.writeTo("demo.bronze.bronze_menu_items").createOrReplace()
@@ -177,115 +228,133 @@ class BronzeIngestion:
         """Ingest drivers from batch source"""
         print("🚗 Ingesting drivers...")
         
-        # Simulate drivers data
+        # Simulate drivers data (without ratings - those go to separate table)
         drivers_data = [
-            ("driver_001", "Alice Johnson", 4.8, "North"),
-            ("driver_002", "Bob Smith", 4.5, "South"),
-            ("driver_003", "Carol Davis", 4.9, "East"),
-            ("driver_004", "David Wilson", 4.2, "West"),
-            ("driver_005", "Eva Brown", 4.7, "North"),
-            ("driver_006", "Frank Miller", 4.6, "South"),
-            ("driver_007", "Grace Lee", 4.8, "East"),
-            ("driver_008", "Henry Taylor", 4.3, "West"),
-            ("driver_009", "Ivy Chen", 4.9, "North"),
-            ("driver_010", "Jack Anderson", 4.4, "South"),
-            ("driver_011", "Kate Thompson", 4.7, "East"),
-            ("driver_012", "Leo Garcia", 4.5, "West"),
-            ("driver_013", "Mia Rodriguez", 4.8, "North"),
-            ("driver_014", "Noah Martinez", 4.6, "South"),
-            ("driver_015", "Olivia White", 4.9, "East"),
-            ("driver_016", "Paul Harris", 4.3, "West"),
-            ("driver_017", "Quinn Clark", 4.7, "North"),
-            ("driver_018", "Ruby Lewis", 4.5, "South"),
-            ("driver_019", "Sam Walker", 4.8, "East"),
-            ("driver_020", "Tina Hall", 4.4, "West")
+            ("driver_001", "Alice Johnson", "North", "2023-01-15"),
+            ("driver_002", "Bob Smith", "South", "2023-02-20"),
+            ("driver_003", "Carol Davis", "East", "2023-01-10"),
+            ("driver_004", "David Wilson", "West", "2023-03-05"),
+            ("driver_005", "Eva Brown", "North", "2023-02-15"),
+            ("driver_006", "Frank Miller", "South", "2023-01-25"),
+            ("driver_007", "Grace Lee", "East", "2023-03-10"),
+            ("driver_008", "Henry Taylor", "West", "2023-02-08"),
+            ("driver_009", "Ivy Chen", "North", "2023-01-30"),
+            ("driver_010", "Jack Anderson", "South", "2023-03-15"),
+            ("driver_011", "Kate Thompson", "East", "2023-02-25"),
+            ("driver_012", "Leo Garcia", "West", "2023-01-20"),
+            ("driver_013", "Mia Rodriguez", "North", "2023-03-01"),
+            ("driver_014", "Noah Martinez", "South", "2023-02-10"),
+            ("driver_015", "Olivia White", "East", "2023-01-05"),
+            ("driver_016", "Paul Harris", "West", "2023-03-20"),
+            ("driver_017", "Quinn Clark", "North", "2023-02-18"),
+            ("driver_018", "Ruby Lewis", "South", "2023-01-12"),
+            ("driver_019", "Sam Walker", "East", "2023-03-08"),
+            ("driver_020", "Tina Young", "West", "2023-02-22")
         ]
         
         schema = StructType([
             StructField("driver_id", StringType(), False),
             StructField("name", StringType(), False),
-            StructField("rating", FloatType(), False),
-            StructField("zone", StringType(), False)
+            StructField("zone", StringType(), False),
+            StructField("created_at", StringType(), False)
         ])
         
         drivers_df = (
             self.spark.createDataFrame(drivers_data, schema)
-            .withColumn("ingest_timestamp", current_timestamp())
+            .withColumn("created_at", to_timestamp(col("created_at")))
         )
         
         # Write to Bronze Iceberg table
         drivers_df.writeTo("demo.bronze.bronze_drivers").createOrReplace()
         print(f"✅ Ingested {drivers_df.count()} drivers")
-    
-    def _ingest_restaurant_performance(self):
-        """Ingest restaurant performance reports (late-arriving data)"""
-        print("🏪 Ingesting restaurant performance...")
+
+    def _ingest_restaurants(self):
+        """Ingest restaurants from batch source"""
+        print("🏪 Ingesting restaurants...")
         
-        # Simulate restaurant performance data (daily reports)
-        from datetime import datetime, timedelta
-        import random
-        
-        restaurants = ["rest_001", "rest_002", "rest_003", "rest_004", "rest_005"]
-        performance_data = []
-        
-        # Generate data for last 7 days
-        for i in range(7):
-            report_date = (datetime.now() - timedelta(days=i)).date()
-            for restaurant_id in restaurants:
-                performance_data.append((
-                    report_date,
-                    restaurant_id,
-                    round(random.uniform(15, 45), 1),  # avg_prep_time
-                    round(random.uniform(3.5, 5.0), 1),  # avg_rating
-                    random.randint(20, 100),  # orders_count
-                    round(random.uniform(0.02, 0.15), 3),  # cancel_rate
-                    round(random.uniform(2.0, 8.0), 2)  # avg_tip
-                ))
+        # Simulate restaurants data
+        restaurants_data = [
+            ("rest_001", "Pizza Palace", "Italian", "North", True, "2023-01-01"),
+            ("rest_002", "Burger Barn", "American", "South", True, "2023-01-02"),
+            ("rest_003", "Sushi Spot", "Japanese", "East", True, "2023-01-03"),
+            ("rest_004", "Taco Town", "Mexican", "West", True, "2023-01-04"),
+            ("rest_005", "Curry Corner", "Indian", "North", True, "2023-01-05")
+        ]
         
         schema = StructType([
-            StructField("report_date", DateType(), False),
             StructField("restaurant_id", StringType(), False),
-            StructField("avg_prep_time", FloatType(), False),
-            StructField("avg_rating", FloatType(), False),
-            StructField("orders_count", IntegerType(), False),
-            StructField("cancel_rate", FloatType(), False),
-            StructField("avg_tip", FloatType(), False)
+            StructField("restaurant_name", StringType(), False),
+            StructField("cuisine_type", StringType(), False),
+            StructField("zone", StringType(), False),
+            StructField("active_flag", BooleanType(), False),
+            StructField("created_at", StringType(), False)
         ])
         
-        performance_df = (
-            self.spark.createDataFrame(performance_data, schema)
-            .withColumn("ingest_timestamp", current_timestamp())
+        restaurants_df = (
+            self.spark.createDataFrame(restaurants_data, schema)
+            .withColumn("created_at", to_timestamp(col("created_at")))
         )
         
         # Write to Bronze Iceberg table
-        performance_df.writeTo("demo.bronze.bronze_restaurant_performance").createOrReplace()
-        print(f"✅ Ingested {performance_df.count()} restaurant performance records")
-    
+        restaurants_df.writeTo("demo.bronze.bronze_restaurants").createOrReplace()
+        print(f"✅ Ingested {restaurants_df.count()} restaurants")
+
+    def _ingest_ratings(self):
+        """Ingest ratings from batch source"""
+        print("⭐ Ingesting ratings...")
+        
+        # Simulate ratings data
+        ratings_data = [
+            ("rating_001", "order_001", "driver_001", "rest_001", 4.8, 4.5, 4.7, "2024-01-15 20:30:00", "order_completion"),
+            ("rating_002", "order_002", "driver_002", "rest_002", 4.5, 4.2, 4.3, "2024-01-15 21:15:00", "order_completion"),
+            ("rating_003", "order_003", "driver_003", "rest_003", 4.9, 4.8, 4.9, "2024-01-16 19:45:00", "order_completion"),
+            ("rating_004", "order_004", "driver_004", "rest_004", 4.2, 4.0, 4.1, "2024-01-16 20:20:00", "order_completion"),
+            ("rating_005", "order_005", "driver_005", "rest_005", 4.7, 4.6, 4.8, "2024-01-17 18:30:00", "order_completion"),
+        ]
+        
+        schema = StructType([
+            StructField("rating_id", StringType(), False),
+            StructField("order_id", StringType(), False),
+            StructField("driver_id", StringType(), False),
+            StructField("restaurant_id", StringType(), False),
+            StructField("driver_rating", FloatType(), False),
+            StructField("food_rating", FloatType(), False),
+            StructField("delivery_rating", FloatType(), False),
+            StructField("rating_time", StringType(), False),
+            StructField("rating_type", StringType(), False)
+        ])
+        
+        ratings_df = (
+            self.spark.createDataFrame(ratings_data, schema)
+            .withColumn("rating_time", to_timestamp(col("rating_time")))
+        )
+        
+        # Write to Bronze Iceberg table
+        ratings_df.writeTo("demo.bronze.bronze_ratings").createOrReplace()
+        print(f"✅ Ingested {ratings_df.count()} ratings")
+        
     def _ingest_weather_data(self):
-        """Ingest weather data (external API simulation)"""
+        """Ingest weather data from external API simulation"""
         print("🌤️ Ingesting weather data...")
         
         # Simulate weather data
-        from datetime import datetime, timedelta
-        import random
-        
-        zones = ["North", "South", "East", "West"]
-        conditions = ["Sunny", "Cloudy", "Rainy", "Stormy"]
-        weather_data = []
-        
-        # Generate hourly weather data for last 24 hours
-        for i in range(24):
-            weather_time = datetime.now() - timedelta(hours=i)
-            for zone in zones:
-                weather_data.append((
-                    weather_time,
-                    round(random.uniform(15, 35), 1),  # temperature
-                    random.choice(conditions),  # condition
-                    zone
-                ))
+        weather_data = [
+            ("2024-01-15 12:00:00", 22.5, "Sunny", "North"),
+            ("2024-01-15 12:00:00", 25.0, "Partly Cloudy", "South"),
+            ("2024-01-15 12:00:00", 20.8, "Cloudy", "East"),
+            ("2024-01-15 12:00:00", 23.2, "Sunny", "West"),
+            ("2024-01-15 18:00:00", 19.5, "Cloudy", "North"),
+            ("2024-01-15 18:00:00", 22.8, "Clear", "South"),
+            ("2024-01-15 18:00:00", 18.9, "Rainy", "East"),
+            ("2024-01-15 18:00:00", 21.3, "Partly Cloudy", "West"),
+            ("2024-01-16 12:00:00", 24.1, "Sunny", "North"),
+            ("2024-01-16 12:00:00", 26.5, "Hot", "South"),
+            ("2024-01-16 12:00:00", 22.0, "Cloudy", "East"),
+            ("2024-01-16 12:00:00", 25.8, "Sunny", "West")
+        ]
         
         schema = StructType([
-            StructField("weather_time", TimestampType(), False),
+            StructField("weather_time", StringType(), False),
             StructField("temperature", FloatType(), False),
             StructField("condition", StringType(), False),
             StructField("zone", StringType(), False)
@@ -293,7 +362,7 @@ class BronzeIngestion:
         
         weather_df = (
             self.spark.createDataFrame(weather_data, schema)
-            .withColumn("ingest_timestamp", current_timestamp())
+            .withColumn("weather_time", to_timestamp(col("weather_time")))
         )
         
         # Write to Bronze Iceberg table
@@ -301,60 +370,65 @@ class BronzeIngestion:
         print(f"✅ Ingested {weather_df.count()} weather records")
     
     def _get_orders_schema(self):
-        """Define schema for orders JSON"""
+        """Schema for orders JSON from Kafka"""
         return StructType([
-            StructField("order_id", StringType(), False),
-            StructField("customer_id", StringType(), False),
-            StructField("restaurant_id", StringType(), False),
-            StructField("driver_id", StringType(), False),
-            StructField("order_timestamp", StringType(), False),
+            StructField("order_id", StringType(), True),
+            StructField("customer_id", StringType(), True),
+            StructField("restaurant_id", StringType(), True),
+            StructField("driver_id", StringType(), True),
+            StructField("order_timestamp", StringType(), True),
+            StructField("order_status", StringType(), True),
             StructField("delivery_timestamp", StringType(), True),
-            StructField("order_status", StringType(), False),
-            StructField("items", ArrayType(StructType([
-                StructField("item_id", StringType(), False),
-                StructField("item_name", StringType(), False),
-                StructField("quantity", IntegerType(), False),
-                StructField("unit_price", FloatType(), False),
-                StructField("total_price", FloatType(), False)
-            ])), False),
-            StructField("total_amount", FloatType(), False),
-            StructField("payment_method", StringType(), False)
+            StructField("total_amount", StringType(), True),
+            StructField("prep_start_timestamp", StringType(), True),
+            StructField("prep_end_timestamp", StringType(), True),
+            StructField("tip_amount", StringType(), True)
+        ])
+
+    def _get_order_items_schema(self):
+        """Schema for order items JSON from Kafka"""
+        return StructType([
+            StructField("order_item_id", StringType(), True),
+            StructField("order_id", StringType(), True),
+            StructField("item_id", StringType(), True),
+            StructField("quantity", StringType(), True),
+            StructField("item_price", StringType(), True),
+            StructField("order_time", StringType(), True)
         ])
     
     def _get_locations_schema(self):
-        """Define schema for driver locations JSON"""
+        """Schema for driver locations JSON from Kafka"""
         return StructType([
-            StructField("location_id", StringType(), False),
-            StructField("driver_id", StringType(), False),
-            StructField("timestamp", StringType(), False),
-            StructField("latitude", FloatType(), False),
-            StructField("longitude", FloatType(), False),
-            StructField("status", StringType(), False),
-            StructField("speed", FloatType(), False)
+            StructField("location_id", StringType(), True),
+            StructField("driver_id", StringType(), True),
+            StructField("timestamp", StringType(), True),
+            StructField("latitude", FloatType(), True),
+            StructField("longitude", FloatType(), True),
+            StructField("status", StringType(), True),
+            StructField("speed", FloatType(), True)
         ])
     
     def stop(self):
         """Stop Spark session"""
-        self.spark.stop()
+        if self.spark:
+            self.spark.stop()
+            print("🛑 Bronze ingestion stopped")
 
 if __name__ == "__main__":
-    bronze_ingestion = BronzeIngestion()
-    
+    ingestion = BronzeIngestion()
     try:
+        # Ingest batch data first
+        ingestion.ingest_batch_data()
+        
         # Start streaming ingestion
-        orders_query = bronze_ingestion.ingest_orders_stream()
-        locations_query = bronze_ingestion.ingest_driver_locations_stream()
+        orders_query = ingestion.ingest_orders_stream()
+        order_items_query = ingestion.ingest_order_items_stream()
+        locations_query = ingestion.ingest_driver_locations_stream()
         
-        # Ingest batch data
-        bronze_ingestion.ingest_batch_data()
-        
-        print("🎯 Bronze layer ingestion running...")
-        print("Press Ctrl+C to stop")
-        
-        # Keep streaming jobs running
+        # Keep running
         orders_query.awaitTermination()
         
     except KeyboardInterrupt:
-        print("🛑 Stopping bronze ingestion...")
+        print("⏹️ Stopping ingestion...")
     finally:
-        bronze_ingestion.stop() 
+        ingestion.stop() 

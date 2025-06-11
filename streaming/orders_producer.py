@@ -46,7 +46,7 @@ class OrdersProducer:
         }
 
     def generate_order(self, late_arrival=False):
-        """Generate a realistic order with optional late arrival simulation"""
+        """Generate a realistic order with separate order and order items"""
         restaurant = random.choice(self.restaurants)
         customer_id = random.choice(self.customers)
         driver_id = random.choice(self.drivers)
@@ -62,68 +62,89 @@ class OrdersProducer:
         
         order_id = str(uuid.uuid4())
         
+        # Calculate delivery and prep times
+        prep_start_time = event_time + timedelta(minutes=random.randint(2, 8))
+        prep_duration = random.randint(15, 45)
+        prep_end_time = prep_start_time + timedelta(minutes=prep_duration)
+        
+        delivery_duration = random.randint(20, 60)
+        delivery_time = event_time + timedelta(minutes=delivery_duration)
+        
         # Generate order items
-        items = []
+        order_items = []
+        total_amount = 0
+        
         if restaurant["id"] in self.menu_items:
             num_items = random.randint(1, 4)
             selected_items = random.sample(self.menu_items[restaurant["id"]], 
                                          min(num_items, len(self.menu_items[restaurant["id"]])))
             
-            for item in selected_items:
+            for idx, item in enumerate(selected_items):
                 quantity = random.randint(1, 3)
-                items.append({
+                item_price = item["price"]
+                
+                order_item = {
+                    "order_item_id": f"{order_id}_item_{idx+1}",
+                    "order_id": order_id,
                     "item_id": item["id"],
-                    "item_name": item["name"],
-                    "quantity": quantity,
-                    "unit_price": item["price"],
-                    "total_price": round(item["price"] * quantity, 2)
-                })
+                    "quantity": str(quantity),
+                    "item_price": str(item_price),
+                    "order_time": event_time.isoformat()
+                }
+                order_items.append(order_item)
+                total_amount += quantity * item_price
         
-        order_amount = sum(item["total_price"] for item in items)
+        # Add delivery fee and tip
         delivery_fee = round(random.uniform(2.99, 5.99), 2)
-        tip_amount = round(random.uniform(0, order_amount * 0.2), 2)
-        total_amount = round(order_amount + delivery_fee + tip_amount, 2)
+        tip_amount = round(random.uniform(0, total_amount * 0.2), 2)
+        total_amount = round(total_amount + delivery_fee, 2)
+        
+        # Determine order status
+        status = random.choice(["placed", "confirmed", "preparing", "ready", "picked_up", "delivered"])
         
         order = {
             "order_id": order_id,
             "customer_id": customer_id,
             "restaurant_id": restaurant["id"],
-            "restaurant_name": restaurant["name"],
             "driver_id": driver_id,
-            "event_timestamp": event_time.isoformat(),
             "order_timestamp": event_time.isoformat(),
-            "order_status": random.choice(["placed", "confirmed", "preparing", "ready", "picked_up", "delivered"]),
-            "items": items,
-            "order_amount": order_amount,
-            "delivery_fee": delivery_fee,
-            "tip_amount": tip_amount,
-            "total_amount": total_amount,
-            "payment_method": random.choice(["credit_card", "debit_card", "cash", "digital_wallet"]),
-            "delivery_address": self.fake.address(),
-            "special_instructions": random.choice([None, "Leave at door", "Ring doorbell", "Call when arrived"])
+            "order_status": status,
+            "delivery_timestamp": delivery_time.isoformat() if status == "delivered" else None,
+            "total_amount": str(total_amount),
+            "prep_start_timestamp": prep_start_time.isoformat(),
+            "prep_end_timestamp": prep_end_time.isoformat(),
+            "tip_amount": str(tip_amount)
         }
         
-        return order
+        return order, order_items
 
     def produce_orders(self, num_orders=100, delay_seconds=1, late_arrival_probability=0.1):
-        """Produce orders to Kafka topic"""
+        """Produce orders and order items to Kafka topics"""
         print(f"Starting to produce {num_orders} orders...")
         
         for i in range(num_orders):
             # Simulate late-arriving data
             late_arrival = random.random() < late_arrival_probability
-            order = self.generate_order(late_arrival=late_arrival)
+            order, order_items = self.generate_order(late_arrival=late_arrival)
             
-            # Send to Kafka
+            # Send order to Kafka
             future = self.producer.send(
                 'orders-topic',
                 key=order['order_id'],
                 value=order
             )
             
+            # Send order items to Kafka
+            for order_item in order_items:
+                item_future = self.producer.send(
+                    'order-items-topic',
+                    key=order_item['order_item_id'],
+                    value=order_item
+                )
+            
             # Log the order
             status = "LATE" if late_arrival else "REAL-TIME"
-            print(f"[{status}] Sent order {i+1}/{num_orders}: {order['order_id']} - ${order['total_amount']}")
+            print(f"[{status}] Sent order {i+1}/{num_orders}: {order['order_id']} with {len(order_items)} items - ${order['total_amount']}")
             
             time.sleep(delay_seconds)
         
