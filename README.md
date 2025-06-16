@@ -64,7 +64,7 @@ Complete end-to-end data engineering solution for a food delivery platform, impl
 
 ### 1. Clone and Setup
 ```bash
-git clone <your-repo-url>
+git clone https://github.com/Rimidelo/WoEat---Data-Engineering---Final-Project
 cd WoEat---Data-Engineering---Final-Project
 ```
 
