@@ -55,206 +55,64 @@ Complete end-to-end data engineering solution for a food delivery platform, impl
 - `dim_menu_items` - Menu item dimension
 - `dim_date` - Date dimension for time-based analysis
 
-## Quick Start
+## 🚀 Quick Start Guide (Follow These Steps Exactly)
 
-### Prerequisites
-- Docker Desktop installed and running
-- At least 8GB RAM available for containers
-- Ports 8080, 8181, 8888, 9000, 9001, 9092, 8081 available
-
-### 1. Clone and Setup
+### Step 1: Clone and Setup
 ```bash
 git clone https://github.com/Rimidelo/WoEat---Data-Engineering---Final-Project
 cd WoEat---Data-Engineering---Final-Project
 ```
 
-### 2. Start All Services
+### Step 2: Create Required Docker Networks
 ```bash
-# Start Spark + Iceberg + MinIO
+docker network create woeat---data-engineering---final-project_iceberg_net
+docker network create woeat---data-engineering---final-project_kafka_net
+```
+
+### Step 3: Start All Services (Wait for each to complete)
+```bash
+# Start Spark + Iceberg + MinIO (wait for this to finish)
 docker-compose -f docker-compose.spark.yml up -d
 
-# Start Kafka (optional for streaming)
+# Start Kafka services (wait for this to finish)
 docker-compose -f docker-compose.kafka.yml up -d
 
-# Start Airflow (optional for orchestration)
+# Start Airflow (wait for this to finish)
 docker-compose -f docker-compose.airflow.yml up -d
 ```
 
-### 3. Access Services
-- **Airflow UI**: http://localhost:8080 (admin/admin)
-- **Spark UI**: http://localhost:4040
-- **MinIO Console**: http://localhost:9001 (admin/password)
-- **Kafka UI**: http://localhost:8081
+### Step 4: Wait 2 Minutes
+Wait for all services to fully start before proceeding.
 
-### 4. Run the Complete Pipeline
-
-#### Option A: Full Automated Pipeline
+### Step 5: Run the Complete Data Pipeline (One Command)
 ```bash
-# Run complete pipeline (Bronze → Silver → Gold)
 docker exec spark-iceberg python /home/iceberg/processing/run_full_pipeline.py
 ```
 
-#### Option B: Step-by-Step Execution
+This single command will:
+- Create all required tables
+- Ingest sample data (Bronze layer)
+- Generate 5000 orders with items and ratings
+- Clean and process data (Silver layer)
+- Create analytics-ready tables (Gold layer)
 
-**Step 1: Bronze Layer - Raw Data Ingestion**
+### Step 6: Access Your Data and UIs
+- **Spark UI**: http://localhost:8080 (Monitor data processing jobs and performance)
+- **Airflow UI**: http://localhost:4040 (admin/admin - Workflow orchestration and scheduling)
+- **MinIO Console**: http://localhost:9001 (admin/password - View data files and storage)
+- **Kafka UI**: http://localhost:8081 (Monitor streaming topics and messages)
+- **Schema Registry**: http://localhost:8082 (Kafka schema management)
+
+### Step 7: View Your Data
 ```bash
-# Ingest raw data from multiple sources
-docker exec spark-iceberg python /home/iceberg/processing/bronze_ingestion.py
+# Show all tables created
+docker exec spark-iceberg python /home/iceberg/project/show_tables.py
+
+# Show sample orders data
+docker exec spark-iceberg python /home/iceberg/project/show_all_orders.py
+
+# Verify data integrity
+docker exec spark-iceberg python /home/iceberg/project/verify_orders.py
 ```
-
-**Step 2: Generate Large Dataset**
-```bash
-# Generate 5000 orders with items and ratings
-docker exec spark-iceberg python /home/iceberg/processing/generate_5000_orders.py
-```
-
-**Step 3: Silver Layer - Data Quality & Cleaning**
-```bash
-# Clean and validate data, create performance aggregations
-docker exec spark-iceberg python /home/iceberg/processing/silver_processing.py
-```
-
-**Step 4: Gold Layer - Dimensional Modeling**
-```bash
-# Create star schema with SCD Type 2 dimensions
-docker exec spark-iceberg python /home/iceberg/processing/gold_processing.py
-```
-
-### 5. Start Real-time Streaming (Optional)
-```bash
-# Terminal 1: Start orders and order items producer
-cd streaming && python orders_producer.py
-
-# Terminal 2: Start driver locations producer  
-cd streaming && python driver_locations_producer.py
-```
-
-### 6. Query Your Data
-
-**Check Table Structure**
-```sql
--- Bronze tables
-SHOW TABLES FROM demo.bronze;
-
--- Silver tables  
-SHOW TABLES FROM demo.silver;
-
--- Gold tables (Star Schema)
-SHOW TABLES FROM demo.gold;
-```
-
-**Sample Business Queries**
-```sql
--- Restaurant Performance Analysis
-SELECT 
-    dr.restaurant_name,
-    dr.cuisine_type,
-    COUNT(fo.order_key) as total_orders,
-    SUM(fo.total_amount) as total_revenue,
-    AVG(fo.delivery_minutes) as avg_delivery_time,
-    AVG(fr.food_rating) as avg_food_rating
-FROM demo.gold.fact_orders fo
-JOIN demo.gold.dim_restaurants dr ON fo.restaurant_key = dr.restaurant_key  
-LEFT JOIN demo.gold.fact_ratings fr ON fo.order_key = fr.order_key
-WHERE dr.is_current = true
-GROUP BY dr.restaurant_id, dr.restaurant_name, dr.cuisine_type
-ORDER BY total_revenue DESC;
-
--- Driver Performance Tracking
-SELECT 
-    dd.name as driver_name,
-    COUNT(fo.order_key) as orders_delivered,
-    AVG(fo.delivery_minutes) as avg_delivery_time,
-    AVG(fr.driver_rating) as avg_driver_rating,
-    SUM(fo.tip_amount) as total_tips
-FROM demo.gold.fact_orders fo
-JOIN demo.gold.dim_drivers dd ON fo.driver_key = dd.driver_key
-LEFT JOIN demo.gold.fact_ratings fr ON fo.order_key = fr.order_key
-WHERE dd.is_current = true AND fo.cancelled = false
-GROUP BY dd.driver_id, dd.name
-ORDER BY orders_delivered DESC;
-
--- Daily Business Summary
-SELECT 
-    dd.full_date,
-    fbs.total_orders,
-    fbs.total_revenue,
-    fbs.avg_order_value,
-    fbs.overall_satisfaction,
-    fbs.avg_delivery_time
-FROM demo.gold.fact_business_summary fbs
-JOIN demo.gold.dim_date dd ON fbs.date_key = dd.date_key
-ORDER BY dd.full_date DESC
-LIMIT 30;
-```
-
-## Key Improvements Made
-
-### 1. **Proper Data Normalization**
-- Separated orders from order items
-- Created dedicated ratings table
-- Normalized restaurant and driver data
-
-### 2. **Enhanced Data Quality**
-- Removed aggregated calculations from Bronze layer
-- Added comprehensive data validation in Silver
-- Implemented proper data lineage tracking
-
-### 3. **Advanced Analytics Support**
-- Full star schema implementation
-- SCD Type 2 for historical tracking
-- Business summary tables for executive dashboards
-
-### 4. **Real-world Data Engineering Practices**
-- Proper medallion architecture
-- Data quality monitoring
-- Late-arriving data handling
-- Scalable processing patterns
-
-## Project Structure
-```
-/WoEat---Data-Engineering---Final-Project
-├── /Tables/                # Table schema documentation
-│   ├── bronze_tables.md    # Bronze layer table definitions
-│   ├── silver_tables.md    # Silver layer table definitions
-│   ├── gold_tables.md      # Gold layer table definitions
-│   └── table_changes_explanation.md
-├── /orchestration/         # Airflow DAGs and configurations
-├── /streaming/            # Kafka producers and consumers
-├── /processing/           # Spark applications
-│   ├── bronze_ingestion.py     # Raw data ingestion
-│   ├── silver_processing.py    # Data cleaning & quality
-│   ├── gold_processing.py      # Dimensional modeling
-│   ├── generate_5000_orders.py # Large dataset generation
-│   └── run_full_pipeline.py    # Complete pipeline runner
-├── /docs/                 # Documentation and diagrams
-├── docker-compose.spark.yml    # Spark + Iceberg + MinIO
-├── docker-compose.kafka.yml    # Kafka services
-├── docker-compose.airflow.yml  # Airflow orchestration
-└── README.md
-```
-
-## Installation Steps
-```bash
-# 1. Start core services
-docker compose -f docker-compose.spark.yml up -d
-
-# 2. Install dependencies (if running locally)
-pip install pyspark
-
-# 3. Run the pipeline
-docker exec spark-iceberg python /home/iceberg/processing/run_full_pipeline.py
-```
-
-## Expected Results
-After running the complete pipeline, you'll have:
-- **5,000+ orders** with realistic distribution
-- **10,000+ order items** with proper pricing
-- **3,500+ ratings** across drivers, food, and delivery
-- **Star schema** ready for BI tools
-- **Historical tracking** for changing dimensions
-- **Business metrics** for executive dashboards
-
-🚀 **Your data lakehouse is now ready for production analytics!**
 
 

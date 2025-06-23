@@ -1,0 +1,27 @@
+# Logs and temporary files
+orchestration/logs/
+*.log
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+
+# Temporary files
+temp_*.py
+check_schema.py
+
+# Dashboard files (generated)
+woeat_dashboard.html
+
+# Docker volumes and data
+warehouse/
+spark/
+
+# IDE files
+.vscode/
+.idea/
+
+# OS files
+.DS_Store
+Thumbs.db 
