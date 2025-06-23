@@ -9,7 +9,9 @@ Complete end-to-end data engineering solution for a food delivery platform, impl
 - **Data Quality**: Comprehensive validation and monitoring
 - **Historical Tracking**: SCD Type 2 implementation for dimension tables
 - **Business Intelligence**: Star schema optimized for analytics
+- **Analytics Dashboard**: Interactive business intelligence dashboard with real-time metrics
 - **Scalable Storage**: Apache Iceberg with time travel capabilities
+- **One-Click Demo**: Complete automated demonstration with `python run_demo.py`
 
 ## Architecture
 - **Storage**: Apache Iceberg tables on MinIO (S3-compatible)
@@ -84,7 +86,21 @@ docker-compose -f docker-compose.airflow.yml up -d
 ### Step 4: Wait 2 Minutes
 Wait for all services to fully start before proceeding.
 
-### Step 5: Run the Complete Data Pipeline (One Command)
+### Step 5: Run Complete Demo (Recommended - One Command Does Everything!)
+```bash
+python run_demo.py
+```
+
+This automated demo will:
+- Run the complete data pipeline (Bronze → Silver → Gold)
+- Generate 5,000+ realistic orders with items and ratings
+- Demonstrate late-arriving data handling (main feature)
+- Create and open a professional analytics dashboard
+- Show data verification and business insights
+
+**OR** if you prefer manual steps:
+
+### Alternative: Manual Pipeline Execution
 ```bash
 docker exec spark-iceberg python /home/iceberg/processing/run_full_pipeline.py
 ```
@@ -103,7 +119,23 @@ This single command will:
 - **Kafka UI**: http://localhost:8081 (Monitor streaming topics and messages)
 - **Schema Registry**: http://localhost:8082 (Kafka schema management)
 
-### Step 7: View Your Data
+### Step 7: Generate Analytics Dashboard (If not using run_demo.py)
+```bash
+# Generate comprehensive business analytics dashboard
+python create_data_dashboard.py
+```
+This will create `woeat_dashboard.html` with:
+- Real-time business metrics (5,000+ orders processed)
+- Interactive charts (order status, peak hours, cuisine performance)
+- Restaurant performance analysis
+- Customer behavior insights
+- Revenue analytics
+
+The dashboard will automatically open in your browser.
+
+**Note**: If you used `python run_demo.py` in Step 5, the dashboard is already created and opened!
+
+### Step 8: View Your Data (Optional - for detailed inspection)
 ```bash
 # Show all tables created
 docker exec spark-iceberg python /home/iceberg/project/show_tables.py
