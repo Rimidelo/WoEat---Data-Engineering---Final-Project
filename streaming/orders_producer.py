@@ -14,7 +14,7 @@ class OrdersProducer:
             key_serializer=lambda k: k.encode('utf-8') if k else None
         )
         self.fake = Faker()
-        
+
         # Sample data for realistic orders
         self.restaurants = [
             {"id": "rest_001", "name": "Pizza Palace", "cuisine": "Italian"},

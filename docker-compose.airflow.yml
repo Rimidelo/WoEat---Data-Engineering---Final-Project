@@ -1,7 +1,6 @@
 version: '3.8'
 
-x-airflow-common:
-  &airflow-common
+x-airflow-common: &airflow-common
   image: apache/airflow:2.7.1-python3.11
   environment: &airflow-common-env
     AIRFLOW__CORE__EXECUTOR: LocalExecutor
@@ -33,7 +32,7 @@ services:
     volumes:
       - postgres-db-volume:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD", "pg_isready", "-U", "airflow"]
+      test: [ "CMD", "pg_isready", "-U", "airflow" ]
       interval: 10s
       retries: 5
       start_period: 5s
@@ -46,9 +45,9 @@ services:
     container_name: airflow-webserver
     command: webserver
     ports:
-      - "8080:8080"
+      - "4040:8080"
     healthcheck:
-      test: ["CMD", "curl", "--fail", "http://localhost:8080/health"]
+      test: [ "CMD", "curl", "--fail", "http://localhost:8080/health" ]
       interval: 30s
       timeout: 10s
       retries: 5
@@ -60,15 +59,15 @@ services:
         condition: service_completed_successfully
     networks:
       - airflow_net
-      - iceberg_net  # Connect to Spark network
-      - kafka_net    # Connect to Kafka network
+      - iceberg_net # Connect to Spark network
+      - kafka_net # Connect to Kafka network
 
   airflow-scheduler:
     <<: *airflow-common
     container_name: airflow-scheduler
     command: scheduler
     healthcheck:
-      test: ["CMD", "curl", "--fail", "http://localhost:8974/health"]
+      test: [ "CMD", "curl", "--fail", "http://localhost:8974/health" ]
       interval: 30s
       timeout: 10s
       retries: 5
@@ -80,8 +79,8 @@ services:
         condition: service_completed_successfully
     networks:
       - airflow_net
-      - iceberg_net  # Connect to Spark network
-      - kafka_net    # Connect to Kafka network
+      - iceberg_net # Connect to Spark network
+      - kafka_net # Connect to Kafka network
 
   airflow-init:
     <<: *airflow-common
@@ -164,6 +163,7 @@ services:
 
 volumes:
   postgres-db-volume:
+
 
 networks:
   airflow_net:

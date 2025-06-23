@@ -79,8 +79,6 @@ def main():
     ⏱️  Estimated time: ~3-5 minutes
     """)
     
-    input("👉 Press Enter to start pipeline...")
-    
     # Step 1: Bronze Layer Batch Ingestion
     print_banner("Step 1: Bronze Layer - Raw Data Ingestion")
     success = run_python_script("bronze_ingestion.py", "Bronze Layer Batch Data Ingestion")

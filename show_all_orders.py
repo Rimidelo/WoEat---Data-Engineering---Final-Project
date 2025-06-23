@@ -24,7 +24,7 @@ SELECT
     fo.total_amount,
     fo.tip_amount,
     dr.restaurant_name,
-    dd.driver_name,
+    dd.name as driver_name,
     CASE 
         WHEN fo.delivery_minutes IS NOT NULL 
         THEN CAST(fo.delivery_minutes AS INT) 

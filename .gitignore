@@ -24,4 +24,7 @@ spark/
 
 # OS files
 .DS_Store
-Thumbs.db 
+Thumbs.db
+
+# VS Code settings (user-specific)
+.vscode/settings.json 
