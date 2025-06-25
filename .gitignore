@@ -17,6 +17,7 @@ woeat_dashboard.html
 # Docker volumes and data
 warehouse/
 spark/
+docs/
 
 # IDE files
 .vscode/
@@ -27,4 +28,6 @@ spark/
 Thumbs.db
 
 # VS Code settings (user-specific)
-.vscode/settings.json 
+.vscode/settings.json
+DEMO_GUIDE.md
+DEMO_GUIDE.md

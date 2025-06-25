@@ -13,7 +13,7 @@ docker network create woeat---data-engineering---final-project_kafka_net
 
 # Start all services (wait 2 minutes between each)
 docker-compose -f docker-compose.spark.yml up -d
-docker-compose -f docker-compose.kafka.yml up -d  
+docker-compose -f docker-compose.kafka.yml up -d 
 docker-compose -f docker-compose.airflow.yml up -d
 ```
 
