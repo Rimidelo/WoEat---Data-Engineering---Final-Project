@@ -2,7 +2,7 @@ from pyspark.sql import SparkSession
 
 spark = SparkSession.builder.appName('ShowTables').getOrCreate()
 
-print('🏗️ Bronze Tables:')
+print('Bronze Tables:')
 spark.sql('SHOW TABLES IN demo.bronze').show(100, False)
 
 print('\n🥈 Silver Tables:')
@@ -12,10 +12,10 @@ print('\n🥇 Gold Tables:')
 spark.sql('SHOW TABLES IN demo.gold').show(100, False)
 
 # Sample data from key tables
-print('\n📦 Sample Orders:')
+print('\nSample Orders:')
 spark.sql('SELECT * FROM demo.gold.fact_orders LIMIT 5').show()
 
-print('\n📊 Business Summary:')
+print('\nBusiness Summary:')
 spark.sql('SELECT * FROM demo.gold.fact_business_summary ORDER BY date_key DESC LIMIT 5').show()
 
 print('\n⭐ Top Rated Restaurants:')

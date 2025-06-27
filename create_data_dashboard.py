@@ -17,27 +17,27 @@ class WoEatDashboard:
     def get_summary_stats(self):
         """Get high-level summary statistics"""
         try:
-            bronze_orders = self.spark.sql("SELECT COUNT(*) as count FROM demo.bronze.bronze_orders").collect()[0][0]
+            bronze_orders = self.spark.sql("SELECT COUNT(*) as count FROM bronze.bronze_orders").collect()[0][0]
         except:
             bronze_orders = 0
             
         try:
-            silver_orders = self.spark.sql("SELECT COUNT(*) as count FROM demo.silver.silver_orders").collect()[0][0]
+            silver_orders = self.spark.sql("SELECT COUNT(*) as count FROM silver.silver_orders").collect()[0][0]
         except:
             silver_orders = 0
             
         try:
-            gold_orders = self.spark.sql("SELECT COUNT(*) as count FROM demo.gold.fact_orders").collect()[0][0]
+            gold_orders = self.spark.sql("SELECT COUNT(*) as count FROM gold.fact_orders").collect()[0][0]
         except:
             gold_orders = 0
             
         try:
-            order_items = self.spark.sql("SELECT COUNT(*) as count FROM demo.gold.fact_order_items").collect()[0][0]
+            order_items = self.spark.sql("SELECT COUNT(*) as count FROM gold.fact_order_items").collect()[0][0]
         except:
             order_items = 0
             
         try:
-            ratings = self.spark.sql("SELECT COUNT(*) as count FROM demo.gold.fact_ratings").collect()[0][0]
+            ratings = self.spark.sql("SELECT COUNT(*) as count FROM gold.fact_ratings").collect()[0][0]
         except:
             ratings = 0
             
@@ -58,7 +58,7 @@ class WoEatDashboard:
                 ROUND(AVG(total_amount), 2) as avg_order_value,
                 COUNT(*) as delivered_orders,
                 ROUND(SUM(tip_amount), 2) as total_tips
-            FROM demo.gold.fact_orders 
+            FROM gold.fact_orders 
             WHERE status = 'delivered'
             """
             result = self.spark.sql(revenue_query).collect()[0]
@@ -79,11 +79,11 @@ class WoEatDashboard:
                 dr.restaurant_name,
                 COUNT(*) as order_count,
                 ROUND(SUM(fo.total_amount), 2) as revenue,
-                ROUND(AVG(fr.food_rating), 2) as avg_rating
-            FROM demo.gold.fact_orders fo
-            JOIN demo.gold.dim_restaurants dr ON fo.restaurant_key = dr.restaurant_key
-            LEFT JOIN demo.gold.fact_ratings fr ON fo.order_id = fr.order_id
-            WHERE dr.is_current = true AND fo.status = 'delivered'
+                ROUND(AVG(fr.rating), 2) as avg_rating
+            FROM gold.fact_orders fo
+            JOIN gold.dim_restaurants dr ON fo.restaurant_key = dr.restaurant_key
+            LEFT JOIN gold.fact_ratings fr ON fo.order_id = fr.order_id
+            WHERE fo.status = 'delivered' AND dr.is_current = true
             GROUP BY dr.restaurant_name
             ORDER BY revenue DESC
             LIMIT 5
@@ -97,15 +97,15 @@ class WoEatDashboard:
         try:
             query = """
             SELECT 
-                dd.name as driver_name,
+                dd.driver_name,
                 COUNT(*) as deliveries,
                 ROUND(AVG(fo.delivery_minutes), 1) as avg_delivery_time,
-                ROUND(AVG(fr.driver_rating), 2) as avg_rating
-            FROM demo.gold.fact_orders fo
-            JOIN demo.gold.dim_drivers dd ON fo.driver_key = dd.driver_key
-            LEFT JOIN demo.gold.fact_ratings fr ON fo.order_id = fr.order_id
-            WHERE dd.is_current = true AND fo.status = 'delivered'
-            GROUP BY dd.name
+                ROUND(AVG(fr.rating), 2) as avg_rating
+            FROM gold.fact_orders fo
+            JOIN gold.dim_drivers dd ON fo.driver_key = dd.driver_key
+            LEFT JOIN gold.fact_ratings fr ON fo.order_id = fr.order_id
+            WHERE fo.status = 'delivered' AND dd.is_current = true AND fo.driver_key IS NOT NULL
+            GROUP BY dd.driver_name
             ORDER BY deliveries DESC
             LIMIT 5
             """
@@ -118,12 +118,13 @@ class WoEatDashboard:
         try:
             query = """
             SELECT 
-                DATE(order_time) as order_date,
+                dd.date as order_date,
                 COUNT(*) as daily_orders,
-                ROUND(SUM(total_amount), 2) as daily_revenue
-            FROM demo.gold.fact_orders
-            GROUP BY DATE(order_time)
-            ORDER BY order_date DESC
+                ROUND(SUM(fo.total_amount), 2) as daily_revenue
+            FROM gold.fact_orders fo
+            JOIN gold.dim_date dd ON fo.date_key = dd.date_key
+            GROUP BY dd.date
+            ORDER BY dd.date DESC
             LIMIT 7
             """
             return self.spark.sql(query).toPandas().to_dict('records')
@@ -306,7 +307,7 @@ class WoEatDashboard:
 <body>
     <div class="container">
         <div class="header">
-            <h1>🎯 WoEat Data Engineering Dashboard</h1>
+            <h1>WoEat Data Engineering Dashboard</h1>
             <p>Production-Ready Data Lakehouse • Real-time Analytics • Late-Arriving Data Handling</p>
             <p><small>Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}</small></p>
         </div>
@@ -335,15 +336,15 @@ class WoEatDashboard:
         </div>
         
         <div class="architecture-info">
-            <h3>🏗️ Data Architecture Overview</h3>
+            <h3>Data Architecture Overview</h3>
             <p><strong>Bronze Layer:</strong> {summary['bronze_orders']:,} raw records ingested from multiple sources</p>
             <p><strong>Silver Layer:</strong> {summary['silver_orders']:,} cleaned and validated records with business logic</p>
             <p><strong>Gold Layer:</strong> {summary['gold_orders']:,} analytics-ready records in star schema with SCD Type 2</p>
-            <p class="success">✅ All layers show consistent data counts - Data integrity verified!</p>
+            <p class="success">All layers show consistent data counts - Data integrity verified!</p>
         </div>
         
         <div class="section">
-            <h2>🏪 Top Performing Restaurants</h2>
+            <h2>Top Performing Restaurants</h2>
             <table class="table">
                 <thead>
                     <tr>
@@ -372,7 +373,7 @@ class WoEatDashboard:
         </div>
         
         <div class="section">
-            <h2>🚗 Top Performing Drivers</h2>
+            <h2>Top Performing Drivers</h2>
             <table class="table">
                 <thead>
                     <tr>
@@ -401,7 +402,7 @@ class WoEatDashboard:
         </div>
         
         <div class="section">
-            <h2>📈 Daily Order Trends</h2>
+            <h2>Daily Order Trends</h2>
             <table class="table">
                 <thead>
                     <tr>
@@ -428,7 +429,7 @@ class WoEatDashboard:
         </div>
         
         <div class="footer">
-            <p><strong>🎯 WoEat Data Engineering Final Project</strong></p>
+            <p><strong>WoEat Data Engineering Final Project</strong></p>
             <p>Modern Data Lakehouse • Apache Iceberg • Apache Spark • Real-time Processing</p>
             <p>Demonstrating production-ready data engineering with late-arriving data handling</p>
         </div>
@@ -441,7 +442,7 @@ class WoEatDashboard:
     
     def generate_dashboard(self):
         """Generate and open the dashboard"""
-        print("🎯 Generating WoEat Data Dashboard...")
+        print("Generating WoEat Data Dashboard...")
         html_content = self.create_html_dashboard()
         
         # Save to file
@@ -449,14 +450,14 @@ class WoEatDashboard:
         with open(dashboard_path, 'w', encoding='utf-8') as f:
             f.write(html_content)
         
-        print(f"✅ Dashboard created: {dashboard_path}")
+        print(f"Dashboard created: {dashboard_path}")
         print("🌐 Opening dashboard in your browser...")
         
         # Open in browser
         file_url = f"file://{os.path.abspath(dashboard_path)}"
         webbrowser.open(file_url)
         
-        print("📊 Dashboard ready! You can also manually open woeat_dashboard.html")
+        print("Dashboard ready! You can also manually open woeat_dashboard.html")
         
         self.spark.stop()
 
@@ -491,16 +492,16 @@ def create_comprehensive_dashboard():
             ORDER BY count DESC
         """).collect()
         
-        # Top Performing Restaurants - using correct column names
+        # Top Performing Restaurants - using Gold tables
         top_restaurants = spark.sql("""
-            SELECT r.restaurant_name, r.cuisine_type,
-                   COUNT(o.order_id) as total_orders,
-                   ROUND(SUM(o.total_amount), 2) as total_revenue,
-                   ROUND(AVG(o.total_amount), 2) as avg_order_value
-            FROM bronze.bronze_orders o
-            JOIN bronze.bronze_restaurants r ON o.restaurant_id = r.restaurant_id
-            WHERE o.status = 'delivered'
-            GROUP BY r.restaurant_name, r.cuisine_type
+            SELECT dr.restaurant_name, dr.cuisine_type,
+                   COUNT(fo.order_id) as total_orders,
+                   ROUND(SUM(fo.total_amount), 2) as total_revenue,
+                   ROUND(AVG(fo.total_amount), 2) as avg_order_value
+            FROM gold.fact_orders fo
+            JOIN gold.dim_restaurants dr ON fo.restaurant_key = dr.restaurant_key
+            WHERE fo.status = 'delivered' AND dr.is_current = true
+            GROUP BY dr.restaurant_name, dr.cuisine_type
             ORDER BY total_revenue DESC
             LIMIT 10
         """).collect()
@@ -863,10 +864,11 @@ def create_comprehensive_dashboard():
 </body>
 </html>"""
     
-    with open("woeat_dashboard.html", "w", encoding="utf-8") as f:
+    dashboard_path = "/home/iceberg/project/woeat_dashboard.html"
+    with open(dashboard_path, "w", encoding="utf-8") as f:
         f.write(html_content)
     
-    print("Comprehensive analytics dashboard created successfully!")
+    print(f"Comprehensive analytics dashboard created successfully at: {dashboard_path}")
     spark.stop()
 
 if __name__ == "__main__":

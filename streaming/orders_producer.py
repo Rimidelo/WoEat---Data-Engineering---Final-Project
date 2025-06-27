@@ -7,7 +7,7 @@ from faker import Faker
 import uuid
 
 class OrdersProducer:
-    def __init__(self, bootstrap_servers='localhost:9092'):
+    def __init__(self, bootstrap_servers='kafka:29092'):
         self.producer = KafkaProducer(
             bootstrap_servers=bootstrap_servers,
             value_serializer=lambda v: json.dumps(v).encode('utf-8'),

@@ -67,4 +67,4 @@ networks:
     driver: bridge
   iceberg_net:
     external: true
-    name: woeat---data-engineering---final-project_iceberg_net
+    name: finalproject_iceberg_net

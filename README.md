@@ -3,43 +3,37 @@
 ## 🎯 What This Project Does
 Complete food delivery data pipeline that processes 5,000+ orders and generates a professional business analytics dashboard. Demonstrates modern data engineering with real-time processing, data quality management, and business intelligence.
 
-## 🚀 Quick Demo (3 Simple Steps)
+## Complete Demo Guide
 
-### Step 1: Start the System
+### **For Full Step-by-Step Instructions:**
+📖 **See [PROJECT_GUIDE.md](PROJECT_GUIDE.md)** - The ultimate guide covering:
+
+- 🏗️ **Infrastructure setup** with all services
+- 🔄 **Real-time streaming** with Kafka producers  
+- ⚡ **Spark job monitoring** with UI access
+- 🌊 **Data pipeline flow** (Bronze → Silver → Gold)
+- 📊 **Airflow orchestration** and DAG execution
+- 📈 **Business analytics** dashboard generation
+- 🎯 **Late-arriving data** handling demonstration
+
+### Quick Start (3 Commands)
 ```bash
-# Create required networks
-docker network create woeat---data-engineering---final-project_iceberg_net
-docker network create woeat---data-engineering---final-project_kafka_net
-
-# Start all services (wait 2 minutes between each)
-docker-compose -f docker-compose.spark.yml up -d
+# 1. Start infrastructure (wait 2 minutes between each)
+docker-compose -f docker-compose.spark.yml up -d --build
 docker-compose -f docker-compose.kafka.yml up -d 
 docker-compose -f docker-compose.airflow.yml up -d
+
+# 2. Generate initial data
+docker exec -it spark-iceberg python /home/iceberg/processing/generate_5000_orders.py
+
+# 3. Create analytics dashboard  
+docker exec -it spark-iceberg python /home/iceberg/project/create_data_dashboard.py
 ```
-
-### Step 2: Wait 2 Minutes
-Let all services fully start.
-
-### Step 3: Run the Complete Demo
-```bash
-python run_demo.py
-```
-
-**That's it!** This single command will:
-- ✅ Process 5,000+ realistic food delivery orders
-- ✅ Demonstrate late-arriving data handling (main technical feature)
-- ✅ Generate and open a professional analytics dashboard
-- ✅ Show complete Bronze → Silver → Gold data pipeline
-
-The analytics dashboard will automatically open in your browser showing:
-- 📊 Real-time business metrics and KPIs
-- 📈 Interactive charts (order trends, restaurant performance)
-- 💰 Revenue analysis and customer insights
-- 🎯 Production-ready business intelligence
 
 ## 🌐 Access Points (After Demo Runs)
 - **Analytics Dashboard**: `woeat_dashboard.html` (opens automatically)
-- **Spark Processing UI**: http://localhost:8080
+- **Spark Jobs UI**: http://localhost:4041 (shows individual job execution)
+- **Spark Master UI**: http://localhost:8080 (cluster overview)
 - **Airflow Workflows**: http://localhost:4040 (admin/admin)
 - **Data Storage UI**: http://localhost:9001 (admin/password)
 
@@ -50,7 +44,7 @@ The analytics dashboard will automatically open in your browser showing:
 - **Features**: Real-time streaming, data quality, late data handling
 
 ## 📋 What You'll See
-1. **Complete Data Pipeline**: Automated processing of realistic food delivery data
+1. **Complete Data Pipeline**: Automated processing of food delivery data
 2. **Business Dashboard**: Professional analytics with charts and insights
 3. **Late Data Handling**: Demonstration of real-world data engineering challenges
 4. **Production Quality**: Enterprise-level data architecture and monitoring

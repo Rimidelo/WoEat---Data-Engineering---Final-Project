@@ -14,10 +14,11 @@ services:
       - AWS_ACCESS_KEY_ID=admin
       - AWS_SECRET_ACCESS_KEY=password
       - AWS_REGION=us-east-1
-      - SPARK_UI_PORT=8080
+      - SPARK_UI_PORT=4040
     ports:
       - 8888:8888     # Jupyter
-      - 8080:4050     # Spark-master UI (external:internal)
+      - 8080:8080     # Spark Master UI (your original)
+      - 4041:4040     # Spark Application UI (NEW - no conflict)
       - 10000:10000   # Thrift JDBC (Spark SQL)
       - 10001:10001
     # This image is built from the spark/ directory, which includes the required Kafka connector JARs for streaming support

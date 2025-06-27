@@ -21,7 +21,7 @@ class OrdersGenerator:
     
     def generate_5000_orders(self):
         """Generate 5000 orders with normalized structure"""
-        print("🛍️ Generating 5000 orders with realistic distribution...")
+        print("🛍Generating 5000 orders with realistic distribution...")
         
         drivers = [f"driver_{i:03d}" for i in range(1, 201)]
         restaurants = [f"rest_{i:03d}" for i in range(1, 16)]
@@ -32,7 +32,7 @@ class OrdersGenerator:
         ratings_data = []
         base_time = datetime.now() - timedelta(days=30)  # 30 days of order history
         
-        print("📅 Generating orders across 30-day period...")
+        print("Generating orders across 30-day period...")
         
         for i in range(1, 5001):  # 5000 orders
             if i % 500 == 0:
@@ -153,7 +153,7 @@ class OrdersGenerator:
                 }
                 ratings_data.append(rating)
         
-        print("📦 Creating Spark DataFrames...")
+        print("Creating Spark DataFrames...")
         
         # Create orders DataFrame
         orders_schema = StructType([
@@ -199,28 +199,28 @@ class OrdersGenerator:
         
         ratings_df = self.spark.createDataFrame(ratings_data, ratings_schema)
         
-        print("💾 Saving to Bronze tables...")
+        print("Saving to Bronze tables...")
         
         # Save orders
         orders_df.writeTo("demo.bronze.bronze_orders").createOrReplace()
         orders_count = orders_df.count()
-        print(f"✅ Created bronze_orders with {orders_count} records")
+        print(f"Created bronze_orders with {orders_count} records")
         
         # Save order items
         order_items_df.writeTo("demo.bronze.bronze_order_items").createOrReplace()
         items_count = order_items_df.count()
-        print(f"✅ Created bronze_order_items with {items_count} records")
+        print(f"Created bronze_order_items with {items_count} records")
         
         # Save ratings
         ratings_df.writeTo("demo.bronze.bronze_ratings").createOrReplace()
         ratings_count = ratings_df.count()
-        print(f"✅ Created bronze_ratings with {ratings_count} records")
+        print(f"Created bronze_ratings with {ratings_count} records")
         
         # Show some statistics
-        print("\n📊 Order Statistics:")
+        print("\nOrder Statistics:")
         orders_df.groupBy("status").count().show()
         
-        print("🍽️ Restaurant Order Distribution:")
+        print("🍽Restaurant Order Distribution:")
         orders_df.groupBy("restaurant_id").count().orderBy("count", ascending=False).show(5)
         
         print("⭐ Rating Distribution:")
@@ -235,8 +235,8 @@ class OrdersGenerator:
 if __name__ == "__main__":
     generator = OrdersGenerator()
     orders_count, items_count, ratings_count = generator.generate_5000_orders()
-    print(f"\n🎉 Successfully generated:")
-    print(f"   📦 {orders_count} orders")
-    print(f"   🛒 {items_count} order items")  
-    print(f"   ⭐ {ratings_count} ratings")
-    print("🚀 Your database now has impressive scale for demo!") 
+    print(f"\nSuccessfully generated:")
+    print(f"   {orders_count} orders")
+    print(f"   {items_count} order items")  
+    print(f"   {ratings_count} ratings")
+    print("Database ready for processing pipeline.") 

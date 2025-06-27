@@ -16,7 +16,7 @@ class GoldProcessing:
     
     def process_all_gold_tables(self):
         """Process all Gold layer tables from Silver data"""
-        print("🔄 Starting Gold layer processing...")
+        print("Starting Gold layer processing...")
         
         # Process dimension tables first
         self.process_dim_date()
@@ -32,11 +32,11 @@ class GoldProcessing:
         self.process_fact_driver_daily()
         self.process_fact_business_summary()
         
-        print("✅ Gold layer processing completed")
+        print("Gold layer processing completed")
 
     def process_dim_date(self):
         """Process date dimension table"""
-        print("📅 Processing Dim Date...")
+        print("Processing Dim Date...")
         
         # Generate date range (last 2 years to next 2 years)
         from datetime import datetime, timedelta
@@ -84,11 +84,11 @@ class GoldProcessing:
         
         # Write to Gold Iceberg table
         dim_date.writeTo("demo.gold.dim_date").createOrReplace()
-        print(f"✅ Processed {dim_date.count()} date dimension records")
+        print(f"Processed {dim_date.count()} date dimension records")
     
     def process_dim_drivers_scd2(self):
         """Process drivers dimension with SCD Type 2"""
-        print("🚗 Processing Dim Drivers (SCD Type 2)...")
+        print("Processing Dim Drivers (SCD Type 2)...")
         
         # Read current Silver data
         silver_drivers = self.spark.table("demo.silver.silver_drivers")
@@ -114,8 +114,10 @@ class GoldProcessing:
                     "driver_key",
                     "driver_id",
                     "name",
-                    "zone",
-                    "created_at",
+                    "phone",
+                    "vehicle_type",
+                    "rating",
+                    "is_active",
                     "record_start_date",
                     "record_end_date",
                     "is_current",
@@ -137,14 +139,14 @@ class GoldProcessing:
                     col("new.*"),
                     col("curr.driver_key"),
                     col("curr.name").alias("curr_name"),
-                    col("curr.zone").alias("curr_zone")
+                    col("curr.vehicle_type").alias("curr_vehicle_type")
                 )
             )
             
             # Identify records that have changed
             changed_records = changes.filter(
                 (col("name") != col("curr_name")) |
-                (col("zone") != col("curr_zone"))
+                (col("vehicle_type") != col("curr_vehicle_type"))
             )
             
             # Identify new records
@@ -178,7 +180,7 @@ class GoldProcessing:
                         .withColumn("is_current", lit(True))
                         .withColumn("updated_at", current_timestamp())
                         .select(
-                            "driver_key", "driver_id", "name", "zone", "created_at",
+                            "driver_key", "driver_id", "name", "phone", "vehicle_type", "rating", "is_active",
                             "record_start_date", "record_end_date", "is_current",
                             "ingest_timestamp", "updated_at"
                         )
@@ -211,11 +213,11 @@ class GoldProcessing:
         
         # Write to Gold Iceberg table
         dim_drivers.writeTo("demo.gold.dim_drivers").createOrReplace()
-        print(f"✅ Processed {dim_drivers.count()} driver dimension records")
+        print(f"Processed {dim_drivers.count()} driver dimension records")
     
     def process_dim_restaurants_scd2(self):
         """Process restaurants dimension with SCD Type 2"""
-        print("🏪 Processing Dim Restaurants (SCD Type 2)...")
+        print("Processing Dim Restaurants (SCD Type 2)...")
         
         # Read current Silver data
         silver_restaurants = self.spark.table("demo.silver.silver_restaurants")
@@ -242,9 +244,10 @@ class GoldProcessing:
                     "restaurant_id",
                     "restaurant_name",
                     "cuisine_type",
-                    "zone",
-                    "active_flag",
-                    "created_at",
+                    "address",
+                    "phone",
+                    "rating",
+                    "is_active",
                     "record_start_date",
                     "record_end_date",
                     "is_current",
@@ -267,8 +270,8 @@ class GoldProcessing:
                     col("curr.restaurant_key"),
                     col("curr.restaurant_name").alias("curr_name"),
                     col("curr.cuisine_type").alias("curr_cuisine"),
-                    col("curr.zone").alias("curr_zone"),
-                    col("curr.active_flag").alias("curr_active")
+                    col("curr.address").alias("curr_address"),
+                    col("curr.is_active").alias("curr_active")
                 )
             )
             
@@ -276,8 +279,8 @@ class GoldProcessing:
             changed_records = changes.filter(
                 (col("restaurant_name") != col("curr_name")) |
                 (col("cuisine_type") != col("curr_cuisine")) |
-                (col("zone") != col("curr_zone")) |
-                (col("active_flag") != col("curr_active"))
+                (col("address") != col("curr_address")) |
+                (col("is_active") != col("curr_active"))
             )
             
             # Identify new records
@@ -312,7 +315,7 @@ class GoldProcessing:
                         .withColumn("updated_at", current_timestamp())
                         .select(
                             "restaurant_key", "restaurant_id", "restaurant_name", "cuisine_type",
-                            "zone", "active_flag", "created_at", "record_start_date", 
+                            "address", "phone", "rating", "is_active", "record_start_date", 
                             "record_end_date", "is_current", "ingest_timestamp", "updated_at"
                         )
                     )
@@ -334,7 +337,7 @@ class GoldProcessing:
                         .withColumn("updated_at", current_timestamp())
                         .select(
                             "restaurant_key", "restaurant_id", "restaurant_name", "cuisine_type",
-                            "zone", "active_flag", "created_at", "record_start_date", 
+                            "address", "phone", "rating", "is_active", "record_start_date", 
                             "record_end_date", "is_current", "ingest_timestamp", "updated_at"
                         )
                     )
@@ -344,11 +347,11 @@ class GoldProcessing:
         
         # Write to Gold Iceberg table
         dim_restaurants.writeTo("demo.gold.dim_restaurants").createOrReplace()
-        print(f"✅ Processed {dim_restaurants.count()} restaurant dimension records")
+        print(f"Processed {dim_restaurants.count()} restaurant dimension records")
     
     def process_dim_menu_items(self):
         """Process menu items dimension"""
-        print("🍕 Processing Dim Menu Items...")
+        print("Processing Dim Menu Items...")
         
         # Read from Silver
         silver_menu_items = self.spark.table("demo.silver.silver_menu_items")
@@ -371,11 +374,11 @@ class GoldProcessing:
         
         # Write to Gold Iceberg table
         dim_menu_items.writeTo("demo.gold.dim_menu_items").createOrReplace()
-        print(f"✅ Processed {dim_menu_items.count()} menu item dimension records")
+        print(f"Processed {dim_menu_items.count()} menu item dimension records")
     
     def process_fact_orders(self):
         """Process orders fact table"""
-        print("📦 Processing Fact Orders...")
+        print("Processing Fact Orders...")
         
         # Read source tables
         silver_orders = self.spark.table("demo.silver.silver_orders")
@@ -422,11 +425,11 @@ class GoldProcessing:
         
         # Write to Gold Iceberg table
         fact_orders.writeTo("demo.gold.fact_orders").createOrReplace()
-        print(f"✅ Processed {fact_orders.count()} order fact records")
+        print(f"Processed {fact_orders.count()} order fact records")
     
     def process_fact_order_items(self):
         """Process order items fact table"""
-        print("🛒 Processing Fact Order Items...")
+        print("Processing Fact Order Items...")
         
         # Read source tables
         silver_order_items = self.spark.table("demo.silver.silver_order_items")
@@ -455,7 +458,7 @@ class GoldProcessing:
         
         # Write to Gold Iceberg table
         fact_order_items.writeTo("demo.gold.fact_order_items").createOrReplace()
-        print(f"✅ Processed {fact_order_items.count()} order item fact records")
+        print(f"Processed {fact_order_items.count()} order item fact records")
 
     def process_fact_ratings(self):
         """Process ratings fact table"""
@@ -492,11 +495,11 @@ class GoldProcessing:
         
         # Write to Gold Iceberg table
         fact_ratings.writeTo("demo.gold.fact_ratings").createOrReplace()
-        print(f"✅ Processed {fact_ratings.count()} rating fact records")
+        print(f"Processed {fact_ratings.count()} rating fact records")
 
     def process_fact_restaurant_daily(self):
         """Process restaurant daily performance fact table"""
-        print("📊 Processing Fact Restaurant Daily...")
+        print("Processing Fact Restaurant Daily...")
         
         # Read source tables
         silver_performance = self.spark.table("demo.silver.silver_restaurant_performance")
@@ -527,11 +530,11 @@ class GoldProcessing:
         
         # Write to Gold Iceberg table
         fact_restaurant_daily.writeTo("demo.gold.fact_restaurant_daily").createOrReplace()
-        print(f"✅ Processed {fact_restaurant_daily.count()} restaurant daily fact records")
+        print(f"Processed {fact_restaurant_daily.count()} restaurant daily fact records")
 
     def process_fact_driver_daily(self):
         """Process driver daily performance fact table"""
-        print("🚗 Processing Fact Driver Daily...")
+        print("Processing Fact Driver Daily...")
         
         # Read source tables
         silver_performance = self.spark.table("demo.silver.silver_driver_performance")
@@ -562,11 +565,11 @@ class GoldProcessing:
         
         # Write to Gold Iceberg table
         fact_driver_daily.writeTo("demo.gold.fact_driver_daily").createOrReplace()
-        print(f"✅ Processed {fact_driver_daily.count()} driver daily fact records")
+        print(f"Processed {fact_driver_daily.count()} driver daily fact records")
 
     def process_fact_business_summary(self):
         """Process business summary fact table"""
-        print("📈 Processing Fact Business Summary...")
+        print("Processing Fact Business Summary...")
         
         # Read source tables
         fact_orders = self.spark.table("demo.gold.fact_orders")
@@ -637,20 +640,127 @@ class GoldProcessing:
         
         # Write to Gold Iceberg table
         fact_business_summary.writeTo("demo.gold.fact_business_summary").createOrReplace()
-        print(f"✅ Processed {fact_business_summary.count()} business summary fact records")
+        print(f"Processed {fact_business_summary.count()} business summary fact records")
+    
+    def process_streaming_gold_tables(self):
+        """Process streaming data through Gold layer"""
+        print("Processing streaming data through Gold layer...")
+        
+        try:
+            # Process streaming fact tables
+            self.process_fact_orders_streaming()
+            
+            # Update dimension tables with streaming data
+            self.update_dimensions_from_streaming()
+            
+            print("Streaming Gold processing completed")
+            
+        except Exception as e:
+            print(f"Streaming Gold processing failed: {e}")
+            raise
+    
+    def process_fact_orders_streaming(self):
+        """Create fact_orders from streaming Silver data"""
+        print("Processing streaming orders to fact table...")
+        
+        # Read streaming Silver data
+        silver_orders = self.spark.table("demo.silver.silver_orders")
+        restaurants = self.spark.table("demo.gold.dim_restaurants")
+        drivers = self.spark.table("demo.gold.dim_drivers")
+        
+        # Create fact table with streaming data
+        fact_orders_streaming = (
+            silver_orders
+            .filter(col("processing_timestamp") >= current_timestamp() - expr("INTERVAL 1 DAY"))
+            .join(restaurants.filter(col("is_current") == True), "restaurant_id", "left")
+            .join(drivers.filter(col("is_current") == True), "driver_id", "left")
+            .select(
+                monotonically_increasing_id().alias("order_key"),
+                col("order_id"),
+                col("customer_id"),
+                coalesce(col("restaurant_key"), lit(-1)).alias("restaurant_key"),
+                coalesce(col("driver_key"), lit(-1)).alias("driver_key"),
+                to_date(col("order_time")).alias("order_date"),
+                col("order_time"),
+                col("delivery_time"),
+                col("total_amount"),
+                col("tip_amount"),
+                col("delivery_time_minutes").alias("delivery_minutes"),
+                col("prep_time_minutes").alias("prep_minutes"),
+                col("cancelled"),
+                col("status"),
+                col("data_quality_score"),
+                current_timestamp().alias("created_timestamp")
+            )
+        )
+        
+        # Write streaming data to Gold fact table
+        (fact_orders_streaming
+         .write
+         .format("iceberg")
+         .mode("append")
+         .saveAsTable("demo.gold.fact_orders"))
+        
+        print("Streaming fact_orders processed")
+    
+    def update_dimensions_from_streaming(self):
+        """Update dimension tables with any new data from streaming"""
+        print("Updating dimensions from streaming data...")
+        
+        # For streaming, dimensions are mostly reference data
+        # but we can update customer activity timestamps
+        self._update_customer_activity_streaming()
+        
+        print("Dimension updates from streaming completed")
+    
+    def _update_customer_activity_streaming(self):
+        """Update customer last order timestamp from streaming data"""
+        print("👥 Updating customer activity from streaming...")
+        
+        # Get recent customer activity from streaming Silver data
+        recent_customers = (
+            self.spark.table("demo.silver.silver_orders")
+            .filter(col("processing_timestamp") >= current_timestamp() - expr("INTERVAL 1 DAY"))
+            .groupBy("customer_id")
+            .agg(
+                max("order_time").alias("last_order_time"),
+                count("*").alias("recent_order_count")
+            )
+        )
+        
+        # This would typically be a merge operation in production
+        # For now, we'll just track it as new records
+        customer_updates = (
+            recent_customers
+            .select(
+                col("customer_id"),
+                col("last_order_time"),
+                col("recent_order_count"),
+                current_timestamp().alias("updated_timestamp")
+            )
+        )
+        
+        # Write customer activity updates
+        (customer_updates
+         .write
+         .format("iceberg")
+         .mode("append")
+         .saveAsTable("demo.gold.customer_activity_streaming"))
+        
+        print("Customer activity updated from streaming")
     
     def stop(self):
         """Stop Spark session"""
         if self.spark:
             self.spark.stop()
-            print("🛑 Gold processing stopped")
+            print("Gold processing stopped")
 
 if __name__ == "__main__":
     gold_processor = GoldProcessing()
     try:
         gold_processor.process_all_gold_tables()
-        print("🎯 Gold layer processing completed successfully!")
+        print("Gold layer processing completed successfully!")
     except Exception as e:
-        print(f"❌ Gold processing failed: {str(e)}")
+        print(f"Gold processing failed: {str(e)}")
     finally:
         gold_processor.stop() 

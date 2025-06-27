@@ -29,5 +29,14 @@ Thumbs.db
 
 # VS Code settings (user-specific)
 .vscode/settings.json
-DEMO_GUIDE.md
-DEMO_GUIDE.md
+
+# Demo and presentation files (private - not for teacher)
+*test*
+*Test*
+*TEST*
+
+# Presentation materials
+*.pptx
+*.ppt
+presentation/
+slides/

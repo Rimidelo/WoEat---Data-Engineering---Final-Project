@@ -10,7 +10,7 @@ x-airflow-common: &airflow-common
     AIRFLOW__CORE__LOAD_EXAMPLES: 'false'
     AIRFLOW__API__AUTH_BACKENDS: 'airflow.api.auth.backend.basic_auth,airflow.api.auth.backend.session'
     AIRFLOW__SCHEDULER__ENABLE_HEALTH_CHECK: 'true'
-    _PIP_ADDITIONAL_REQUIREMENTS: 'pyspark==3.5.0 kafka-python==2.0.2 pandas==2.0.3'
+    _PIP_ADDITIONAL_REQUIREMENTS: ''
   volumes:
     - ./orchestration/dags:/opt/airflow/dags
     - ./orchestration/logs:/opt/airflow/logs
@@ -170,7 +170,7 @@ networks:
     driver: bridge
   iceberg_net:
     external: true
-    name: woeat---data-engineering---final-project_iceberg_net
+    name: finalproject_iceberg_net
   kafka_net:
     external: true
-    name: woeat---data-engineering---final-project_kafka_net
+    name: finalproject_kafka_net

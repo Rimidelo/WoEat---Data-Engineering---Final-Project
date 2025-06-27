@@ -2,16 +2,16 @@ from pyspark.sql import SparkSession
 
 spark = SparkSession.builder.appName('ShowAllOrders').getOrCreate()
 
-print('📦 WoEat - All Orders Report')
+print('WoEat - All Orders Report')
 print('=' * 80)
 
 # Get total count first
 total_orders = spark.sql("SELECT COUNT(*) FROM demo.gold.fact_orders").collect()[0][0]
-print(f'📊 Total Orders in Database: {total_orders:,}')
+print(f'Total Orders in Database: {total_orders:,}')
 print('=' * 80)
 
 # Show all orders with key information
-print('🔍 All Orders Details:')
+print('All Orders Details:')
 print()
 
 # Query to get all orders with readable information
@@ -45,11 +45,11 @@ print("📋 Showing ALL orders (this may take a moment for 5,000 orders)...")
 orders_df.show(n=5000, truncate=False)
 
 # Summary statistics
-print("\n📊 Order Summary Statistics:")
+print("\nOrder Summary Statistics:")
 print("=" * 50)
 
 # Status breakdown
-print("📈 Orders by Status:")
+print("Orders by Status:")
 spark.sql("""
     SELECT status, COUNT(*) as count, 
            ROUND(COUNT(*) * 100.0 / (SELECT COUNT(*) FROM demo.gold.fact_orders), 2) as percentage
@@ -59,7 +59,7 @@ spark.sql("""
 """).show()
 
 # Restaurant breakdown
-print("🏪 Orders by Restaurant:")
+print("Orders by Restaurant:")
 spark.sql("""
     SELECT dr.restaurant_name, COUNT(*) as order_count
     FROM demo.gold.fact_orders fo
@@ -70,7 +70,7 @@ spark.sql("""
 """).show()
 
 # Daily order distribution
-print("📅 Orders by Date:")
+print("Orders by Date:")
 spark.sql("""
     SELECT DATE(order_time) as order_date, COUNT(*) as daily_orders
     FROM demo.gold.fact_orders
@@ -79,7 +79,7 @@ spark.sql("""
 """).show(30)
 
 # Revenue statistics
-print("💰 Revenue Statistics:")
+print("Revenue Statistics:")
 spark.sql("""
     SELECT 
         ROUND(SUM(total_amount), 2) as total_revenue,
@@ -92,7 +92,7 @@ spark.sql("""
     WHERE status = 'delivered'
 """).show()
 
-print(f"\n✅ Successfully displayed all {total_orders:,} orders!")
-print("📝 Use the scroll functionality in your terminal to view all orders above.")
+print(f"\nSuccessfully displayed all {total_orders:,} orders.")
+print("Use the scroll functionality in your terminal to view all orders above.")
 
 spark.stop() 
