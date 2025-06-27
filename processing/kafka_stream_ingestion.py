@@ -12,6 +12,7 @@ from spark_config import create_spark_session
 from pyspark.sql.functions import *
 from pyspark.sql.types import *
 import signal
+import time
 
 # Global variables for graceful shutdown
 streaming_queries = []
@@ -60,7 +61,7 @@ def create_kafka_stream_ingestion():
     ])
     
     try:
-        # Read from Kafka orders topic
+        # STEP 1: Start Orders Stream First
         print("Connecting to Kafka orders topic...")
         orders_stream = spark \
             .readStream \
@@ -97,16 +98,26 @@ def create_kafka_stream_ingestion():
             .writeStream \
             .format("iceberg") \
             .outputMode("append") \
-            .option("path", "bronze.bronze_orders") \
+            .option("path", "demo.bronze.bronze_orders") \
             .option("checkpointLocation", "/tmp/checkpoints/orders") \
             .trigger(processingTime="10 seconds") \
             .queryName("Bronze-Orders-Stream") \
             .start()
         
         streaming_queries.append(orders_query)
-        print("Orders streaming query started")
+        print("✅ Orders streaming query started")
         
-        # Read from Kafka order-items topic
+        # WAIT FOR FIRST STREAM TO STABILIZE
+        print("⏳ Waiting 15 seconds for orders stream to stabilize...")
+        time.sleep(15)
+        
+        # Check if first stream is still active
+        if not orders_query.isActive:
+            raise Exception("Orders stream failed to start properly")
+        
+        print("✅ Orders stream is stable, starting order items stream...")
+        
+        # STEP 2: Start Order Items Stream Second
         print("Connecting to Kafka order-items topic...")
         order_items_stream = spark \
             .readStream \
@@ -138,33 +149,34 @@ def create_kafka_stream_ingestion():
             .writeStream \
             .format("iceberg") \
             .outputMode("append") \
-            .option("path", "bronze.bronze_order_items") \
+            .option("path", "demo.bronze.bronze_order_items") \
             .option("checkpointLocation", "/tmp/checkpoints/order_items") \
             .trigger(processingTime="10 seconds") \
             .queryName("Bronze-OrderItems-Stream") \
             .start()
         
         streaming_queries.append(order_items_query)
-        print("Order items streaming query started")
+        print("✅ Order items streaming query started")
         
-        print("\nKafka streaming ingestion is running...")
-        print("   Orders: orders-topic -> bronze_orders")
-        print("   Order Items: order-items-topic -> bronze_order_items")
-        print("   Processing every 10 seconds")
-        print("   Press Ctrl+C to stop")
+        print("\n🚀 Kafka streaming ingestion is running...")
+        print("   📦 Orders: orders-topic -> bronze_orders")
+        print("   📋 Order Items: order-items-topic -> bronze_order_items")
+        print("   ⏱️ Processing every 10 seconds")
+        print("   🛑 Press Ctrl+C to stop")
         
         # Wait for termination
         for query in streaming_queries:
             query.awaitTermination()
             
     except Exception as e:
-        print(f"Streaming ingestion failed: {str(e)}")
+        print(f"❌ Streaming ingestion failed: {str(e)}")
+        print("🔧 Stopping all active streams...")
         for query in streaming_queries:
             if query.isActive:
                 query.stop()
         raise
     finally:
-        print("Stopping streaming ingestion...")
+        print("🛑 Stopping streaming ingestion...")
         spark.stop()
 
 if __name__ == "__main__":
