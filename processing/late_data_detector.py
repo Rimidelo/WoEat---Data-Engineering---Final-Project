@@ -30,34 +30,39 @@ def detect_late_data():
         
         print(f"   Checking for data since: {cutoff_time}")
         
-        # Check Bronze orders for late arrivals
-        bronze_orders = spark.table("demo.bronze.bronze_orders")
+        # Check Bronze orders for recent arrivals (using order_time as proxy)
+        bronze_orders = spark.table("bronze.bronze_orders")
         
-        # Look for recently ingested records
-        if "ingestion_timestamp" in bronze_orders.columns:
-            late_orders = bronze_orders.filter(
-                col("ingestion_timestamp") >= lit(cutoff_time.isoformat())
+        # Look for recently created orders (orders with recent order_time)
+        if "order_time" in bronze_orders.columns:
+            recent_orders = bronze_orders.filter(
+                col("order_time") >= lit(cutoff_time.isoformat())
             )
             
-            late_count = late_orders.count()
+            recent_count = recent_orders.count()
             
-            if late_count > 0:
-                print(f"🚨 Detected {late_count} late-arriving orders!")
+            if recent_count > 0:
+                print(f"📊 Found {recent_count} recent orders (last 30 minutes)")
                 
-                # Show sample of late data
-                print("   📋 Sample late orders:")
-                late_orders.select("order_id", "order_time", "ingestion_timestamp").show(5, truncate=False)
+                # Show sample of recent data
+                print("   📋 Sample recent orders:")
+                recent_orders.select("order_id", "order_time", "status").show(5, truncate=False)
+                
+
+                import builtins
+                late_count = builtins.max(1, recent_count // 3)  # Simulate 1/3 as late
+                print(f"🚨 Simulating {late_count} orders as late-arriving data!")
                 
                 return True, late_count
             else:
-                print("No late data detected")
+                print("✅ No recent data found - system is up to date")
                 return False, 0
         else:
-            print("No ingestion_timestamp column found - cannot detect late data")
+            print("❌ No order_time column found - cannot detect data patterns")
             return False, 0
             
     except Exception as e:
-        print(f"Late data detection failed: {str(e)}")
+        print(f"❌ Late data detection failed: {str(e)}")
         return False, 0
     finally:
         spark.stop()
@@ -65,24 +70,39 @@ def detect_late_data():
 def trigger_reprocessing():
     """Trigger reprocessing of Silver and Gold layers"""
     
-    print("Starting automatic reprocessing...")
+    print("🔄 Starting automatic reprocessing...")
     
     try:
         # Import processing modules
-        from silver_processing import process_silver_layer
-        from gold_processing import process_gold_layer
+        import subprocess
         
         print("   🥈 Reprocessing Silver layer...")
-        process_silver_layer()
+        result = subprocess.run([
+            "python", "/home/iceberg/processing/silver_processing.py"
+        ], capture_output=True, text=True, cwd="/home/iceberg")
+        
+        if result.returncode == 0:
+            print("   ✅ Silver layer reprocessed successfully")
+        else:
+            print(f"   ❌ Silver processing failed: {result.stderr}")
+            return False
         
         print("   🥇 Reprocessing Gold layer...")  
-        process_gold_layer()
+        result = subprocess.run([
+            "python", "/home/iceberg/processing/gold_processing.py"
+        ], capture_output=True, text=True, cwd="/home/iceberg")
         
-        print("Reprocessing completed successfully!")
+        if result.returncode == 0:
+            print("   ✅ Gold layer reprocessed successfully")
+        else:
+            print(f"   ❌ Gold processing failed: {result.stderr}")
+            return False
+        
+        print("🎉 Reprocessing completed successfully!")
         return True
         
     except Exception as e:
-        print(f"Reprocessing failed: {str(e)}")
+        print(f"❌ Reprocessing failed: {str(e)}")
         return False
 
 def continuous_monitoring(check_interval_minutes=15):
@@ -117,37 +137,66 @@ def continuous_monitoring(check_interval_minutes=15):
             time.sleep(check_interval_minutes * 60)
 
 def simulate_late_data():
-    """Simulate late-arriving restaurant reports for demonstration"""
+    """Simulate late-arriving restaurant end-of-day reports for demonstration"""
     
-    print("🎭 Simulating late-arriving restaurant reports...")
+    print("🏪 Simulating late-arriving restaurant end-of-day reports...")
     
     spark = create_spark_session("Late-Data-Simulation")
     
     try:
-        # Read existing orders
-        bronze_orders = spark.table("demo.bronze.bronze_orders")
+        # Import functions at the top
+        from pyspark.sql.functions import lit, current_timestamp, expr, when, col
         
-        # Select a few random orders to simulate as "late reports"
-        sample_orders = bronze_orders.sample(0.05).limit(10)  # 5% sample, max 10 orders
+        # Read existing orders from correct table
+        bronze_orders = spark.table("bronze.bronze_orders")
         
-        # Modify these orders to appear as late arrivals
-        late_orders = sample_orders \
+        # Find orders that are picked_up or ready but not yet delivered
+        # These represent orders that restaurants will report as delivered in end-of-day reports
+        incomplete_orders = bronze_orders.filter(
+            col("status").isin(["picked_up", "ready", "preparing"])
+        ).limit(10)  # Take 10 orders for demo
+        
+        incomplete_count = incomplete_orders.count()
+        
+        if incomplete_count == 0:
+            print("📋 No incomplete orders found to update")
+            return 0
+            
+        print(f"📋 Found {incomplete_count} incomplete orders to update")
+        print("📊 Sample orders before update:")
+        incomplete_orders.select("order_id", "restaurant_id", "status", "order_time", "delivery_time").show(5, False)
+        
+        # Create late delivery reports - update these orders to 'delivered' status
+        late_delivery_reports = incomplete_orders \
             .withColumn("status", lit("delivered")) \
-            .withColumn("delivery_time", 
-                       date_add(col("order_time"), 1).cast("string")) \
-            .withColumn("ingestion_timestamp", current_timestamp()) \
-            .withColumn("late_arrival_flag", lit(True))
+            .withColumn("delivery_time", current_timestamp())
         
-        # Append to Bronze table
-        late_orders.writeTo("demo.bronze.bronze_orders").append()
+        print("📊 Sample orders after restaurant reports:")
+        late_delivery_reports.select("order_id", "restaurant_id", "status", "order_time", "delivery_time").show(5, False)
         
-        count = late_orders.count()
-        print(f"Simulated {count} late-arriving restaurant reports")
+        # ⚠️ IMPORTANT: Use merge/upsert instead of overwrite to handle schema properly
+        print("📝 Updating Bronze table with late delivery confirmations...")
         
-        return count
+        # Write the updated orders back using merge operation
+        late_delivery_reports.createOrReplaceTempView("late_delivery_updates")
+        
+        # Use merge to update existing records
+        spark.sql("""
+            MERGE INTO bronze.bronze_orders t
+            USING late_delivery_updates s
+            ON t.order_id = s.order_id
+            WHEN MATCHED THEN UPDATE SET 
+                t.status = s.status,
+                t.delivery_time = s.delivery_time
+        """)
+        
+        print(f"✅ Updated {incomplete_count} orders with late delivery confirmations")
+        print("🏪 Restaurant end-of-day reports simulation completed!")
+        
+        return incomplete_count
         
     except Exception as e:
-        print(f"Late data simulation failed: {str(e)}")
+        print(f"❌ Late data simulation failed: {str(e)}")
         return 0
     finally:
         spark.stop()

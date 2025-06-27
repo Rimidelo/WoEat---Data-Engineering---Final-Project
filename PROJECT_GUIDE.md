@@ -205,11 +205,43 @@ Silver: 5,000+ orders (Processed)
 Gold: 5,000+ orders (Analytics ready)
 ```
 
-#### **8.1 Late Data Detection**
+#### **8.1 Late Data Detection & Restaurant End-of-Day Reports**
+
+**🏪 For DEMO - Use Simulate Mode (Recommended):**
 ```bash
-# Check for late-arriving data and trigger reprocessing
+# Simulate restaurant end-of-day delivery confirmations
+docker exec -it spark-iceberg python /home/iceberg/processing/late_data_detector.py --mode simulate
+```
+
+**What this does:**
+- 🔍 **Finds incomplete orders** (status: `preparing`, `picked_up`, `ready`)
+- 📝 **Updates them to `delivered`** with delivery timestamps
+- 🔄 **Triggers automatic reprocessing** of Silver and Gold layers
+- 📊 **Shows before/after status** for visual confirmation
+
+**🔍 For Production - Use Detect Mode:**
+```bash
+# Check for late-arriving data and trigger reprocessing if needed
 docker exec -it spark-iceberg python /home/iceberg/processing/late_data_detector.py --mode detect
 ```
+
+**What this does:**
+- 🕐 **Looks for recent data** (last 30 minutes)
+- 🚨 **Simulates late data detection** (1/3 of recent orders)
+- 🔄 **Triggers reprocessing** if late data found
+
+**📊 Continuous Monitoring Mode:**
+```bash
+# Continuously monitor for late data (runs forever)
+docker exec -it spark-iceberg python /home/iceberg/processing/late_data_detector.py --mode monitor --interval 15
+```
+
+**How Late Data Detection Works:**
+1. **Reads Bronze orders table** to find incomplete deliveries
+2. **Identifies orders** with status `preparing`, `picked_up`, or `ready`  
+3. **Simulates restaurant reports** updating them to `delivered`
+4. **Triggers Silver/Gold reprocessing** to update analytics
+5. **Maintains data consistency** across all layers
 
 #### **8.2 Final Verification**
 ```bash
@@ -276,9 +308,11 @@ Gold: 5,000+ orders (Analytics ready with updates)
 - Optimized for analytics queries
 
 **🔍 Late Data Detection:**
-- Detects late-arriving data automatically
-- Triggers reprocessing of Silver/Gold layers
-- Demonstrates production-grade late data handling
+- **Simulate Mode**: Finds incomplete orders and marks them as delivered (restaurant end-of-day reports)
+- **Detect Mode**: Looks for recent data changes and simulates late arrival detection
+- **Monitor Mode**: Continuously monitors for late data every 15 minutes
+- **Automatic Reprocessing**: Triggers Silver/Gold layer updates when late data is detected
+- **Real-World Scenario**: Simulates restaurants sending delivery confirmations at end of day
 
 ---
 
