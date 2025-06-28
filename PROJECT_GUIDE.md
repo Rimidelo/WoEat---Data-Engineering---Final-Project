@@ -118,6 +118,12 @@ Gold: 0 orders (not processed yet)
 docker exec -it spark-iceberg python /home/iceberg/project/streaming/orders_producer.py
 ```
 
+> Fast order simulation (optional):
+> ```powershell
+> docker exec spark-iceberg python -c "import sys; sys.path.append('/home/iceberg/project'); from streaming.orders_producer import OrdersProducer as O; p=O(); p.produce_orders(num_orders=3000, delay_seconds=0.05, late_arrival_probability=0.1); p.close()"
+> ```
+> Generates 3 000 orders in ~2½ min at ~20 orders/s then exits.
+
 **What happens:**
 - Kafka topics (`orders-topic`, `order-items-topic`) are created automatically
 - Producer starts sending real-time and late-arriving orders
