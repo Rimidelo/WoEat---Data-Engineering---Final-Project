@@ -3,16 +3,19 @@ WoEat Data Engineering - Interactive Data Dashboard
 Creates an HTML dashboard to visualize your data pipeline results
 """
 
-from pyspark.sql import SparkSession
+import sys
+import os
+sys.path.append('/home/iceberg/processing')
+
+from spark_config import create_spark_session
 from pyspark.sql.functions import *
 from datetime import datetime
 import json
 import webbrowser
-import os
 
 class WoEatDashboard:
     def __init__(self):
-        self.spark = SparkSession.builder.appName('WoEat-Dashboard').getOrCreate()
+        self.spark = create_spark_session("WoEat-Dashboard")
     
     def get_summary_stats(self):
         """Get high-level summary statistics"""
@@ -462,7 +465,7 @@ class WoEatDashboard:
         self.spark.stop()
 
 def create_comprehensive_dashboard():
-    spark = SparkSession.builder.appName("WoEat-Analytics-Dashboard").getOrCreate()
+    spark = create_spark_session("WoEat-Analytics-Dashboard")
     
     print("Generating comprehensive analytics dashboard...")
     

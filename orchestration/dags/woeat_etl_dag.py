@@ -20,7 +20,7 @@ default_args = {
 dag = DAG(
     'woeat_etl_pipeline',
     default_args=default_args,
-    description='WoEat Clean ETL Pipeline - Organized Bronze/Silver/Gold Processing',
+    description='WoEat ETL Pipeline - Micro-batch processing every 15min (auto-stops when Kafka empty)',
     schedule_interval=timedelta(minutes=15),  # Run every 15 minutes
     catchup=False,
     tags=['woeat', 'streaming', 'kafka', 'etl', 'clean'],
@@ -68,13 +68,17 @@ kafka_health_check = PythonOperator(
     dag=dag,
 )
 
-# Task 3: Bronze Processing - Stream ingestion from Kafka
+# Task 3: Bronze Processing - Stream ingestion from Kafka (auto-stops when empty)
 bronze_stream_ingestion = BashOperator(
     task_id='bronze_stream_ingestion',
     bash_command='''
-    echo "Starting Kafka stream ingestion to Bronze layer..."
-    timeout 300 docker exec spark-iceberg python /home/iceberg/processing/kafka_stream_ingestion.py || true
-    echo "Bronze streaming ingestion completed (5 minute window)"
+    echo "🥉 Starting Kafka stream ingestion to Bronze layer..."
+    echo "Will automatically stop when no new data for 60 seconds..."
+    if ! docker exec spark-iceberg python /home/iceberg/processing/kafka_stream_ingestion.py; then
+        echo "❌ Bronze streaming ingestion failed!"
+        exit 1
+    fi
+    echo "✅ Bronze streaming completed - Kafka topics processed"
     ''',
     dag=dag,
 )

@@ -24,10 +24,13 @@ services:
     # This image is built from the spark/ directory, which includes the required Kafka connector JARs for streaming support
 
   rest:
-    image: apache/iceberg-rest-fixture
+    image: tabulario/iceberg-rest
     container_name: iceberg-rest
     networks: [iceberg_net]
     ports: ["8181:8181"]
+    volumes:
+      - ./warehouse:/tmp/iceberg
+      - iceberg_catalog_data:/home/iceberg
     environment:
       - AWS_ACCESS_KEY_ID=admin
       - AWS_SECRET_ACCESS_KEY=password
@@ -35,6 +38,8 @@ services:
       - CATALOG_WAREHOUSE=s3://warehouse/
       - CATALOG_IO__IMPL=org.apache.iceberg.aws.s3.S3FileIO
       - CATALOG_S3_ENDPOINT=http://minio:9000
+      - CATALOG_S3_PATH__STYLE__ACCESS=true
+      - CATALOG_URI=jdbc:sqlite:file:/home/iceberg/iceberg_catalog.db
 
   minio:
     image: minio/minio
@@ -72,3 +77,6 @@ services:
 
 networks:
   iceberg_net:
+
+volumes:
+  iceberg_catalog_data:

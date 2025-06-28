@@ -41,21 +41,30 @@ def create_spark_session(app_name="WoEat-DataPipeline"):
     conf.set("spark.executor.memory", "2g")
     conf.set("spark.driver.maxResultSize", "1g")
     
-    # Iceberg and S3 Settings
+    # Iceberg and S3 Settings - Using Hadoop catalog for reliability
     conf.set("spark.sql.catalog.demo", "org.apache.iceberg.spark.SparkCatalog")
-    conf.set("spark.sql.catalog.demo.type", "rest")
-    conf.set("spark.sql.catalog.demo.uri", "http://rest:8181")
+    conf.set("spark.sql.catalog.demo.type", "hadoop")
+    conf.set("spark.sql.catalog.demo.warehouse", "s3a://warehouse")
     conf.set("spark.sql.catalog.demo.io-impl", "org.apache.iceberg.aws.s3.S3FileIO")
-    conf.set("spark.sql.catalog.demo.warehouse", "s3://warehouse")
     conf.set("spark.sql.catalog.demo.s3.endpoint", "http://minio:9000")
     conf.set("spark.sql.catalog.demo.s3.path-style-access", "true")
     conf.set("spark.sql.catalog.demo.s3.access-key-id", "admin")
     conf.set("spark.sql.catalog.demo.s3.secret-access-key", "password")
     
-    # Kafka Settings for Streaming
+    # Kafka Settings for Streaming with S3 support
     conf.set("spark.jars.packages", 
              "org.apache.spark:spark-sql-kafka-0-10_2.12:3.3.0,"
-             "org.apache.iceberg:iceberg-spark-runtime-3.3_2.12:1.3.1")
+             "org.apache.iceberg:iceberg-spark-runtime-3.3_2.12:1.3.1,"
+             "org.apache.hadoop:hadoop-aws:3.3.2,"
+             "com.amazonaws:aws-java-sdk-bundle:1.11.1026")
+    
+    # S3 FileSystem configuration for Hadoop catalog
+    conf.set("spark.hadoop.fs.s3a.impl", "org.apache.hadoop.fs.s3a.S3AFileSystem")
+    conf.set("spark.hadoop.fs.s3a.endpoint", "http://minio:9000")
+    conf.set("spark.hadoop.fs.s3a.access.key", "admin")
+    conf.set("spark.hadoop.fs.s3a.secret.key", "password")
+    conf.set("spark.hadoop.fs.s3a.path.style.access", "true")
+    conf.set("spark.hadoop.fs.s3a.connection.ssl.enabled", "false")
     
     # Create session with enhanced config
     spark = (

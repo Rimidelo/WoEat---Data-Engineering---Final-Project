@@ -1,8 +1,13 @@
+import sys
+import os
+sys.path.append('/home/iceberg/processing')
+
 from pyspark.sql import SparkSession
 from pyspark.sql.functions import *
 from pyspark.sql.types import *
 from datetime import datetime, timedelta
 import random
+from spark_config import create_spark_session
 
 def round_float(val, decimals):
     """Safe round function to avoid conflict with Spark functions"""
@@ -10,14 +15,7 @@ def round_float(val, decimals):
 
 class OrdersGenerator:
     def __init__(self):
-        self.spark = (
-            SparkSession.builder
-            .appName("WoEat - 5000 Orders Generator")
-            .config("spark.sql.catalog.demo.s3.path-style-access", "true")
-            .config("spark.sql.catalog.demo.s3.access-key-id", "admin")
-            .config("spark.sql.catalog.demo.s3.secret-access-key", "password")
-            .getOrCreate()
-        )
+        self.spark = create_spark_session("WoEat - 5000 Orders Generator")
     
     def generate_5000_orders(self):
         """Generate 5000 orders with normalized structure"""
@@ -202,17 +200,17 @@ class OrdersGenerator:
         print("Saving to Bronze tables...")
         
         # Save orders
-        orders_df.writeTo("demo.bronze.bronze_orders").createOrReplace()
+        orders_df.writeTo("bronze.bronze_orders").createOrReplace()
         orders_count = orders_df.count()
         print(f"Created bronze_orders with {orders_count} records")
         
         # Save order items
-        order_items_df.writeTo("demo.bronze.bronze_order_items").createOrReplace()
+        order_items_df.writeTo("bronze.bronze_order_items").createOrReplace()
         items_count = order_items_df.count()
         print(f"Created bronze_order_items with {items_count} records")
         
         # Save ratings
-        ratings_df.writeTo("demo.bronze.bronze_ratings").createOrReplace()
+        ratings_df.writeTo("bronze.bronze_ratings").createOrReplace()
         ratings_count = ratings_df.count()
         print(f"Created bronze_ratings with {ratings_count} records")
         

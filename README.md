@@ -1,55 +1,114 @@
-# WoEat - Data Engineering Final Project
+# WoEat – Data Engineering Pipeline
 
-## 🎯 What This Project Does
-Complete food delivery data pipeline that processes 5,000+ orders and generates a professional business analytics dashboard. Demonstrates modern data engineering with real-time processing, data quality management, and business intelligence.
+## 1. Project Purpose
+WoEat is a complete batch + streaming data pipeline that ingests food-delivery data, applies multi-layer processing (Bronze → Silver → Gold), and produces an analytics-ready dashboard. It showcases Apache Spark, Kafka, Iceberg, and Airflow running in Docker.
 
-## Complete Demo Guide
+## 2. Prerequisites
+• Docker Desktop ≥ 20.10 with **docker-compose** enabled
+• Host machine ≈ 8 GB RAM free (Spark + Airflow containers)
 
-### **For Full Step-by-Step Instructions:**
-📖 **See [PROJECT_GUIDE.md](PROJECT_GUIDE.md)** - The ultimate guide covering:
+## 2.1 Container Networking (read once)
+All compose files share two named bridge networks so that Spark, Kafka and Airflow can talk to each other:
+* **finalproject_iceberg_net** – storage / Spark / Airflow
+* **finalproject_kafka_net**   – Kafka / Airflow
 
-- 🏗️ **Infrastructure setup** with all services
-- 🔄 **Real-time streaming** with Kafka producers  
-- ⚡ **Spark job monitoring** with UI access
-- 🌊 **Data pipeline flow** (Bronze → Silver → Gold)
-- 📊 **Airflow orchestration** and DAG execution
-- 📈 **Business analytics** dashboard generation
-- 🎯 **Late-arriving data** handling demonstration
-
-### Quick Start (3 Commands)
+They are created automatically when you launch the first two stacks in the order shown below.  
+If you ever start the stacks out of order and see network-not-found errors, create them manually:
 ```bash
-# 1. Start infrastructure (wait 2 minutes between each)
-docker-compose -f docker-compose.spark.yml up -d --build
-docker-compose -f docker-compose.kafka.yml up -d 
-docker-compose -f docker-compose.airflow.yml up -d
-
-# 2. Generate initial data
-docker exec -it spark-iceberg python /home/iceberg/processing/generate_5000_orders.py
-
-# 3. Create analytics dashboard  
-docker exec -it spark-iceberg python /home/iceberg/project/create_data_dashboard.py
+docker network create finalproject_iceberg_net
+docker network create finalproject_kafka_net
 ```
-
-## 🌐 Access Points (After Demo Runs)
-- **Analytics Dashboard**: `woeat_dashboard.html` (opens automatically)
-- **Spark Jobs UI**: http://localhost:4041 (shows individual job execution)
-- **Spark Master UI**: http://localhost:8080 (cluster overview)
-- **Airflow Workflows**: http://localhost:4040 (admin/admin)
-- **Data Storage UI**: http://localhost:9001 (admin/password)
-
-## 🏗️ Technical Architecture (Overview)
-- **Modern Stack**: Apache Spark, Kafka, Iceberg, Airflow, Docker
-- **Data Layers**: Bronze (raw) → Silver (cleaned) → Gold (analytics)
-- **Scale**: 5,000+ orders, 10,000+ items, 3,500+ ratings
-- **Features**: Real-time streaming, data quality, late data handling
-
-## 📋 What You'll See
-1. **Complete Data Pipeline**: Automated processing of food delivery data
-2. **Business Dashboard**: Professional analytics with charts and insights
-3. **Late Data Handling**: Demonstration of real-world data engineering challenges
-4. **Production Quality**: Enterprise-level data architecture and monitoring
+Then re-run the `docker-compose … up -d` commands.
 
 ---
-**Total Demo Time**: ~8 minutes | **Result**: Professional business analytics dashboard
+## 3. Quick-Start (≈ 15 minutes)
+```bash
+# 1  Spin up core services (wait ~30 s between each command)
+docker-compose -f docker-compose.spark.yml  up -d --build
+docker-compose -f docker-compose.kafka.yml  up -d
+docker-compose -f docker-compose.airflow.yml up -d
+
+# 2  Generate initial 5 000 historical orders
+docker exec spark-iceberg python /home/iceberg/processing/generate_5000_orders.py
+
+# 3  Create the analytics dashboard (optional)
+docker exec spark-iceberg python /home/iceberg/project/create_data_dashboard.py
+```
+When the commands finish you will have:
+• Bronze, Silver and Gold Iceberg tables populated with batch data
+• An HTML dashboard (`woeat_dashboard.html`) that you can copy out and open locally
+
+---
+## 4. Detailed Workflow (when you have more time)
+### 4.1 Infrastructure
+```bash
+# Check containers
+docker ps --format "table {{.Names}}\t{{.Status}}"
+```
+Required containers: `spark-iceberg`  `kafka`  `zookeeper`  `minio`  `iceberg-rest`  `airflow-webserver`  `airflow-scheduler`
+
+### 4.2 (Optional) Real-Time Streaming
+1. **Producer –> Kafka**
+   ```bash
+   docker exec -it spark-iceberg python - <<'PY'
+   from streaming.orders_producer import OrdersProducer
+   OrdersProducer().produce_orders(num_orders=4000, delay_seconds=0.05)
+   PY
+   ```
+2. **Kafka → Bronze**   Handled automatically by either:
+   • `processing/kafka_stream_ingestion.py` (manual run) or
+   • Airflow task **bronze_stream_ingestion** (see §4.3)
+
+### 4.3 Orchestration with Airflow
+1. Open the UI → http://localhost:4040 (login: `admin` / `admin`)
+2. Enable DAG `woeat_etl_pipeline` and click **Trigger DAG**
+3. The DAG will execute:
+   1. Bronze streaming ingestion
+   2. Silver cleaning & validation
+   3. Gold star-schema creation
+   4. Business reports & data-quality checks
+
+### 4.4 Verification
+```bash
+docker exec spark-iceberg python /home/iceberg/project/verify_orders.py
+```
+Expected (after full DAG run):
+```
+Bronze: ≥ 9 000 orders        # 5 000 batch + 4 000 streaming (example)
+Silver: same count (cleaned)
+Gold:   same count (analytics)
+```
+
+---
+## 5. Service End-Points
+| Service | URL | Default Credentials |
+|---------|-----|---------------------|
+| Airflow Web UI | http://localhost:4040 | admin / admin |
+| Spark Master UI | http://localhost:8080 | – |
+| Spark Jobs UI | http://localhost:4041 | – |
+| MinIO Browser | http://localhost:9001 | admin / password |
+| Kafka UI (Redpanda Console) | http://localhost:8081 | – |
+
+---
+## 6. Clean Restart
+```bash
+# Stop containers
+docker-compose -f docker-compose.spark.yml  down
+docker-compose -f docker-compose.kafka.yml  down
+docker-compose -f docker-compose.airflow.yml down
+
+# (Optional) remove volumes
+docker volume prune -f
+
+# Relaunch services
+# …then repeat the Quick-Start
+```
+
+---
+## 7. Need More Detail?
+The full step-by-step demo with screenshots and advanced options lives in **[PROJECT_GUIDE.md](PROJECT_GUIDE.md)**.
+
+---
+© 2025 WoEat Data Team
 
 

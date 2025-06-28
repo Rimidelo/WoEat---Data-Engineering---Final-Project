@@ -1,18 +1,16 @@
+import sys
+import os
+sys.path.append('/home/iceberg/processing')
+
 from pyspark.sql import SparkSession
 from pyspark.sql.functions import *
 from pyspark.sql.types import *
 from pyspark.sql.window import Window
+from spark_config import create_spark_session
 
 class GoldProcessing:
     def __init__(self):
-        self.spark = (
-            SparkSession.builder
-            .appName("WoEat - Gold Layer Processing")
-            .config("spark.sql.catalog.demo.s3.path-style-access", "true")
-            .config("spark.sql.catalog.demo.s3.access-key-id", "admin")
-            .config("spark.sql.catalog.demo.s3.secret-access-key", "password")
-            .getOrCreate()
-        )
+        self.spark = create_spark_session("WoEat - Gold Layer Processing")
     
     def process_all_gold_tables(self):
         """Process all Gold layer tables from Silver data"""
@@ -83,7 +81,7 @@ class GoldProcessing:
         dim_date = self.spark.createDataFrame(date_data, schema)
         
         # Write to Gold Iceberg table
-        dim_date.writeTo("demo.gold.dim_date").createOrReplace()
+        dim_date.writeTo("gold.dim_date").createOrReplace()
         print(f"Processed {dim_date.count()} date dimension records")
     
     def process_dim_drivers_scd2(self):
@@ -91,11 +89,11 @@ class GoldProcessing:
         print("Processing Dim Drivers (SCD Type 2)...")
         
         # Read current Silver data
-        silver_drivers = self.spark.table("demo.silver.silver_drivers")
+        silver_drivers = self.spark.table("silver.silver_drivers")
         
         # Try to read existing Gold dimension
         try:
-            existing_dim = self.spark.table("demo.gold.dim_drivers")
+            existing_dim = self.spark.table("gold.dim_drivers")
             has_existing_data = True
         except:
             has_existing_data = False
@@ -212,7 +210,7 @@ class GoldProcessing:
                 dim_drivers = existing_dim
         
         # Write to Gold Iceberg table
-        dim_drivers.writeTo("demo.gold.dim_drivers").createOrReplace()
+        dim_drivers.writeTo("gold.dim_drivers").createOrReplace()
         print(f"Processed {dim_drivers.count()} driver dimension records")
     
     def process_dim_restaurants_scd2(self):
@@ -220,11 +218,11 @@ class GoldProcessing:
         print("Processing Dim Restaurants (SCD Type 2)...")
         
         # Read current Silver data
-        silver_restaurants = self.spark.table("demo.silver.silver_restaurants")
+        silver_restaurants = self.spark.table("silver.silver_restaurants")
         
         # Try to read existing Gold dimension
         try:
-            existing_dim = self.spark.table("demo.gold.dim_restaurants")
+            existing_dim = self.spark.table("gold.dim_restaurants")
             has_existing_data = True
         except:
             has_existing_data = False
@@ -346,7 +344,7 @@ class GoldProcessing:
                 dim_restaurants = existing_dim
         
         # Write to Gold Iceberg table
-        dim_restaurants.writeTo("demo.gold.dim_restaurants").createOrReplace()
+        dim_restaurants.writeTo("gold.dim_restaurants").createOrReplace()
         print(f"Processed {dim_restaurants.count()} restaurant dimension records")
     
     def process_dim_menu_items(self):
@@ -354,7 +352,7 @@ class GoldProcessing:
         print("Processing Dim Menu Items...")
         
         # Read from Silver
-        silver_menu_items = self.spark.table("demo.silver.silver_menu_items")
+        silver_menu_items = self.spark.table("silver.silver_menu_items")
         
         # Create dimension without restaurant association (as per feedback)
         dim_menu_items = (
@@ -373,7 +371,7 @@ class GoldProcessing:
         )
         
         # Write to Gold Iceberg table
-        dim_menu_items.writeTo("demo.gold.dim_menu_items").createOrReplace()
+        dim_menu_items.writeTo("gold.dim_menu_items").createOrReplace()
         print(f"Processed {dim_menu_items.count()} menu item dimension records")
     
     def process_fact_orders(self):
@@ -381,10 +379,10 @@ class GoldProcessing:
         print("Processing Fact Orders...")
         
         # Read source tables
-        silver_orders = self.spark.table("demo.silver.silver_orders")
-        dim_drivers = self.spark.table("demo.gold.dim_drivers").filter(col("is_current") == True)
-        dim_restaurants = self.spark.table("demo.gold.dim_restaurants").filter(col("is_current") == True)
-        dim_date = self.spark.table("demo.gold.dim_date")
+        silver_orders = self.spark.table("silver.silver_orders")
+        dim_drivers = self.spark.table("gold.dim_drivers").filter(col("is_current") == True)
+        dim_restaurants = self.spark.table("gold.dim_restaurants").filter(col("is_current") == True)
+        dim_date = self.spark.table("gold.dim_date")
         
         # Create fact table with surrogate keys
         fact_orders = (
@@ -424,7 +422,7 @@ class GoldProcessing:
         )
         
         # Write to Gold Iceberg table
-        fact_orders.writeTo("demo.gold.fact_orders").createOrReplace()
+        fact_orders.writeTo("gold.fact_orders").createOrReplace()
         print(f"Processed {fact_orders.count()} order fact records")
     
     def process_fact_order_items(self):
@@ -432,10 +430,10 @@ class GoldProcessing:
         print("Processing Fact Order Items...")
         
         # Read source tables
-        silver_order_items = self.spark.table("demo.silver.silver_order_items")
-        fact_orders = self.spark.table("demo.gold.fact_orders")
-        dim_menu_items = self.spark.table("demo.gold.dim_menu_items")
-        dim_date = self.spark.table("demo.gold.dim_date")
+        silver_order_items = self.spark.table("silver.silver_order_items")
+        fact_orders = self.spark.table("gold.fact_orders")
+        dim_menu_items = self.spark.table("gold.dim_menu_items")
+        dim_date = self.spark.table("gold.dim_date")
         
         # Create fact table with surrogate keys
         fact_order_items = (
@@ -457,7 +455,7 @@ class GoldProcessing:
         )
         
         # Write to Gold Iceberg table
-        fact_order_items.writeTo("demo.gold.fact_order_items").createOrReplace()
+        fact_order_items.writeTo("gold.fact_order_items").createOrReplace()
         print(f"Processed {fact_order_items.count()} order item fact records")
 
     def process_fact_ratings(self):
@@ -465,11 +463,11 @@ class GoldProcessing:
         print("⭐ Processing Fact Ratings...")
         
         # Read source tables
-        silver_ratings = self.spark.table("demo.silver.silver_ratings")
-        fact_orders = self.spark.table("demo.gold.fact_orders")
-        dim_drivers = self.spark.table("demo.gold.dim_drivers").filter(col("is_current") == True)
-        dim_restaurants = self.spark.table("demo.gold.dim_restaurants").filter(col("is_current") == True)
-        dim_date = self.spark.table("demo.gold.dim_date")
+        silver_ratings = self.spark.table("silver.silver_ratings")
+        fact_orders = self.spark.table("gold.fact_orders")
+        dim_drivers = self.spark.table("gold.dim_drivers").filter(col("is_current") == True)
+        dim_restaurants = self.spark.table("gold.dim_restaurants").filter(col("is_current") == True)
+        dim_date = self.spark.table("gold.dim_date")
         
         # Create fact table with surrogate keys
         fact_ratings = (
@@ -494,7 +492,7 @@ class GoldProcessing:
         )
         
         # Write to Gold Iceberg table
-        fact_ratings.writeTo("demo.gold.fact_ratings").createOrReplace()
+        fact_ratings.writeTo("gold.fact_ratings").createOrReplace()
         print(f"Processed {fact_ratings.count()} rating fact records")
 
     def process_fact_restaurant_daily(self):
@@ -502,9 +500,9 @@ class GoldProcessing:
         print("Processing Fact Restaurant Daily...")
         
         # Read source tables
-        silver_performance = self.spark.table("demo.silver.silver_restaurant_performance")
-        dim_restaurants = self.spark.table("demo.gold.dim_restaurants").filter(col("is_current") == True)
-        dim_date = self.spark.table("demo.gold.dim_date")
+        silver_performance = self.spark.table("silver.silver_restaurant_performance")
+        dim_restaurants = self.spark.table("gold.dim_restaurants").filter(col("is_current") == True)
+        dim_date = self.spark.table("gold.dim_date")
         
         # Create fact table with surrogate keys
         fact_restaurant_daily = (
@@ -529,7 +527,7 @@ class GoldProcessing:
         )
         
         # Write to Gold Iceberg table
-        fact_restaurant_daily.writeTo("demo.gold.fact_restaurant_daily").createOrReplace()
+        fact_restaurant_daily.writeTo("gold.fact_restaurant_daily").createOrReplace()
         print(f"Processed {fact_restaurant_daily.count()} restaurant daily fact records")
 
     def process_fact_driver_daily(self):
@@ -537,9 +535,9 @@ class GoldProcessing:
         print("Processing Fact Driver Daily...")
         
         # Read source tables
-        silver_performance = self.spark.table("demo.silver.silver_driver_performance")
-        dim_drivers = self.spark.table("demo.gold.dim_drivers").filter(col("is_current") == True)
-        dim_date = self.spark.table("demo.gold.dim_date")
+        silver_performance = self.spark.table("silver.silver_driver_performance")
+        dim_drivers = self.spark.table("gold.dim_drivers").filter(col("is_current") == True)
+        dim_date = self.spark.table("gold.dim_date")
         
         # Create fact table with surrogate keys
         fact_driver_daily = (
@@ -564,7 +562,7 @@ class GoldProcessing:
         )
         
         # Write to Gold Iceberg table
-        fact_driver_daily.writeTo("demo.gold.fact_driver_daily").createOrReplace()
+        fact_driver_daily.writeTo("gold.fact_driver_daily").createOrReplace()
         print(f"Processed {fact_driver_daily.count()} driver daily fact records")
 
     def process_fact_business_summary(self):
@@ -572,11 +570,11 @@ class GoldProcessing:
         print("Processing Fact Business Summary...")
         
         # Read source tables
-        fact_orders = self.spark.table("demo.gold.fact_orders")
-        fact_ratings = self.spark.table("demo.gold.fact_ratings")
-        dim_date = self.spark.table("demo.gold.dim_date")
-        dim_drivers = self.spark.table("demo.gold.dim_drivers").filter(col("is_current") == True)
-        dim_restaurants = self.spark.table("demo.gold.dim_restaurants").filter(col("is_current") == True)
+        fact_orders = self.spark.table("gold.fact_orders")
+        fact_ratings = self.spark.table("gold.fact_ratings")
+        dim_date = self.spark.table("gold.dim_date")
+        dim_drivers = self.spark.table("gold.dim_drivers").filter(col("is_current") == True)
+        dim_restaurants = self.spark.table("gold.dim_restaurants").filter(col("is_current") == True)
         
         # Create daily business summary using aliases
         daily_summary = (
@@ -639,7 +637,7 @@ class GoldProcessing:
         )
         
         # Write to Gold Iceberg table
-        fact_business_summary.writeTo("demo.gold.fact_business_summary").createOrReplace()
+        fact_business_summary.writeTo("gold.fact_business_summary").createOrReplace()
         print(f"Processed {fact_business_summary.count()} business summary fact records")
     
     def process_streaming_gold_tables(self):
@@ -664,9 +662,9 @@ class GoldProcessing:
         print("Processing streaming orders to fact table...")
         
         # Read streaming Silver data
-        silver_orders = self.spark.table("demo.silver.silver_orders")
-        restaurants = self.spark.table("demo.gold.dim_restaurants")
-        drivers = self.spark.table("demo.gold.dim_drivers")
+        silver_orders = self.spark.table("silver.silver_orders")
+        restaurants = self.spark.table("gold.dim_restaurants")
+        drivers = self.spark.table("gold.dim_drivers")
         
         # Create fact table with streaming data
         fact_orders_streaming = (
@@ -699,7 +697,7 @@ class GoldProcessing:
          .write
          .format("iceberg")
          .mode("append")
-         .saveAsTable("demo.gold.fact_orders"))
+         .saveAsTable("gold.fact_orders"))
         
         print("Streaming fact_orders processed")
     
@@ -719,7 +717,7 @@ class GoldProcessing:
         
         # Get recent customer activity from streaming Silver data
         recent_customers = (
-            self.spark.table("demo.silver.silver_orders")
+            self.spark.table("silver.silver_orders")
             .filter(col("processing_timestamp") >= current_timestamp() - expr("INTERVAL 1 DAY"))
             .groupBy("customer_id")
             .agg(
@@ -745,7 +743,7 @@ class GoldProcessing:
          .write
          .format("iceberg")
          .mode("append")
-         .saveAsTable("demo.gold.customer_activity_streaming"))
+         .saveAsTable("gold.customer_activity_streaming"))
         
         print("Customer activity updated from streaming")
     

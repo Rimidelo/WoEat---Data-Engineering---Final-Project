@@ -1,12 +1,16 @@
-from pyspark.sql import SparkSession
+import sys
+import os
+sys.path.append('/home/iceberg/processing')
 
-spark = SparkSession.builder.appName('ShowAllOrders').getOrCreate()
+from spark_config import create_spark_session
+
+spark = create_spark_session("ShowAllOrders")
 
 print('WoEat - All Orders Report')
 print('=' * 80)
 
 # Get total count first
-total_orders = spark.sql("SELECT COUNT(*) FROM demo.gold.fact_orders").collect()[0][0]
+total_orders = spark.sql("SELECT COUNT(*) FROM gold.fact_orders").collect()[0][0]
 print(f'Total Orders in Database: {total_orders:,}')
 print('=' * 80)
 
@@ -31,9 +35,9 @@ SELECT
         ELSE NULL 
     END as delivery_minutes,
     fo.cancelled
-FROM demo.gold.fact_orders fo
-LEFT JOIN demo.gold.dim_restaurants dr ON fo.restaurant_key = dr.restaurant_key AND dr.is_current = true
-LEFT JOIN demo.gold.dim_drivers dd ON fo.driver_key = dd.driver_key AND dd.is_current = true
+FROM gold.fact_orders fo
+LEFT JOIN gold.dim_restaurants dr ON fo.restaurant_key = dr.restaurant_key AND dr.is_current = true
+LEFT JOIN gold.dim_drivers dd ON fo.driver_key = dd.driver_key AND dd.is_current = true
 ORDER BY fo.order_time
 """
 
@@ -52,8 +56,8 @@ print("=" * 50)
 print("Orders by Status:")
 spark.sql("""
     SELECT status, COUNT(*) as count, 
-           ROUND(COUNT(*) * 100.0 / (SELECT COUNT(*) FROM demo.gold.fact_orders), 2) as percentage
-    FROM demo.gold.fact_orders 
+           ROUND(COUNT(*) * 100.0 / (SELECT COUNT(*) FROM gold.fact_orders), 2) as percentage
+    FROM gold.fact_orders 
     GROUP BY status 
     ORDER BY count DESC
 """).show()
@@ -62,8 +66,8 @@ spark.sql("""
 print("Orders by Restaurant:")
 spark.sql("""
     SELECT dr.restaurant_name, COUNT(*) as order_count
-    FROM demo.gold.fact_orders fo
-    JOIN demo.gold.dim_restaurants dr ON fo.restaurant_key = dr.restaurant_key 
+    FROM gold.fact_orders fo
+    JOIN gold.dim_restaurants dr ON fo.restaurant_key = dr.restaurant_key 
     WHERE dr.is_current = true
     GROUP BY dr.restaurant_name
     ORDER BY order_count DESC
@@ -73,7 +77,7 @@ spark.sql("""
 print("Orders by Date:")
 spark.sql("""
     SELECT DATE(order_time) as order_date, COUNT(*) as daily_orders
-    FROM demo.gold.fact_orders
+    FROM gold.fact_orders
     GROUP BY DATE(order_time)
     ORDER BY order_date
 """).show(30)
@@ -88,7 +92,7 @@ spark.sql("""
         ROUND(MAX(total_amount), 2) as max_order,
         ROUND(SUM(tip_amount), 2) as total_tips,
         ROUND(AVG(tip_amount), 2) as avg_tip
-    FROM demo.gold.fact_orders
+    FROM gold.fact_orders
     WHERE status = 'delivered'
 """).show()
 

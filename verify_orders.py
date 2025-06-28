@@ -1,6 +1,10 @@
-from pyspark.sql import SparkSession
+import sys
+import os
+sys.path.append('/home/iceberg/processing')
 
-spark = SparkSession.builder.appName('VerifyOrders').getOrCreate()
+from spark_config import create_spark_session
+
+spark = create_spark_session("VerifyOrders")
 
 print('Data Verification Across All Layers:')
 print('=' * 50)
@@ -14,12 +18,12 @@ def safe_count(table_name):
         return 0
 
 # Check Bronze layer
-bronze_orders = safe_count("demo.bronze.bronze_orders")
-bronze_items = safe_count("demo.bronze.bronze_order_items") 
-bronze_ratings = safe_count("demo.bronze.bronze_ratings")
-bronze_restaurants = safe_count("demo.bronze.bronze_restaurants")
-bronze_drivers = safe_count("demo.bronze.bronze_drivers")
-bronze_menu = safe_count("demo.bronze.bronze_menu_items")
+bronze_orders = safe_count("bronze.bronze_orders")
+bronze_items = safe_count("bronze.bronze_order_items") 
+bronze_ratings = safe_count("bronze.bronze_ratings")
+bronze_restaurants = safe_count("bronze.bronze_restaurants")
+bronze_drivers = safe_count("bronze.bronze_drivers")
+bronze_menu = safe_count("bronze.bronze_menu_items")
 
 print(f'BRONZE LAYER:')
 print(f'   Orders: {bronze_orders:,}')
@@ -30,8 +34,8 @@ print(f'   Drivers: {bronze_drivers:,}')
 print(f'   Menu Items: {bronze_menu:,}')
 
 # Check Silver layer  
-silver_orders = safe_count("demo.silver.silver_orders")
-silver_items = safe_count("demo.silver.silver_order_items")
+silver_orders = safe_count("silver.silver_orders")
+silver_items = safe_count("silver.silver_order_items")
 
 print(f'\nSILVER LAYER:')
 if silver_orders > 0:
@@ -41,8 +45,8 @@ else:
     print(f'   No data (not processed yet)')
 
 # Check Gold layer
-gold_orders = safe_count("demo.gold.fact_orders")
-gold_items = safe_count("demo.gold.fact_order_items")
+gold_orders = safe_count("gold.fact_orders")
+gold_items = safe_count("gold.fact_order_items")
 
 print(f'\nGOLD LAYER:')
 if gold_orders > 0:

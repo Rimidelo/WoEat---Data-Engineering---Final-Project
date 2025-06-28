@@ -1,18 +1,16 @@
+import sys
+import os
+sys.path.append('/home/iceberg/processing')
+
 from pyspark.sql import SparkSession
 from pyspark.sql.functions import *
 from pyspark.sql.types import *
 from pyspark.sql.window import Window
+from spark_config import create_spark_session
 
 class SilverProcessing:
     def __init__(self):
-        self.spark = (
-            SparkSession.builder
-            .appName("WoEat - Silver Layer Processing")
-            .config("spark.sql.catalog.demo.s3.path-style-access", "true")
-            .config("spark.sql.catalog.demo.s3.access-key-id", "admin")
-            .config("spark.sql.catalog.demo.s3.secret-access-key", "password")
-            .getOrCreate()
-        )
+        self.spark = create_spark_session("WoEat - Silver Layer Processing")
     
     def process_all_silver_tables(self):
         """Process all Silver layer tables from Bronze data"""
@@ -36,7 +34,7 @@ class SilverProcessing:
         print("Processing Silver Orders...")
         
         # Read from Bronze
-        bronze_orders = self.spark.table("demo.bronze.bronze_orders")
+        bronze_orders = self.spark.table("bronze.bronze_orders")
         
         # Data cleaning and validation with calculated fields
         silver_orders = (
@@ -86,7 +84,7 @@ class SilverProcessing:
         )
         
         # Write to Silver Iceberg table
-        silver_orders.writeTo("demo.silver.silver_orders").createOrReplace()
+        silver_orders.writeTo("silver.silver_orders").createOrReplace()
         print(f"Processed {silver_orders.count()} orders to Silver layer")
 
     def process_silver_order_items(self):
@@ -94,7 +92,7 @@ class SilverProcessing:
         print("Processing Silver Order Items...")
         
         # Read from Bronze
-        bronze_order_items = self.spark.table("demo.bronze.bronze_order_items")
+        bronze_order_items = self.spark.table("bronze.bronze_order_items")
         
         # Data cleaning and validation with calculated fields
         silver_order_items = (
@@ -121,7 +119,7 @@ class SilverProcessing:
         )
         
         # Write to Silver Iceberg table
-        silver_order_items.writeTo("demo.silver.silver_order_items").createOrReplace()
+        silver_order_items.writeTo("silver.silver_order_items").createOrReplace()
         print(f"Processed {silver_order_items.count()} order items to Silver layer")
     
     def process_silver_menu_items(self):
@@ -129,7 +127,7 @@ class SilverProcessing:
         print("Processing Silver Menu Items...")
         
         # Read from Bronze
-        bronze_menu_items = self.spark.table("demo.bronze.bronze_menu_items")
+        bronze_menu_items = self.spark.table("bronze.bronze_menu_items")
         
         # Data cleaning and validation
         silver_menu_items = (
@@ -155,7 +153,7 @@ class SilverProcessing:
         )
         
         # Write to Silver Iceberg table
-        silver_menu_items.writeTo("demo.silver.silver_menu_items").createOrReplace()
+        silver_menu_items.writeTo("silver.silver_menu_items").createOrReplace()
         print(f"Processed {silver_menu_items.count()} menu items to Silver layer")
     
     def process_silver_drivers(self):
@@ -163,7 +161,7 @@ class SilverProcessing:
         print("Processing Silver Drivers...")
         
         # Read from Bronze
-        bronze_drivers = self.spark.table("demo.bronze.bronze_drivers")
+        bronze_drivers = self.spark.table("bronze.bronze_drivers")
         
         # Data cleaning and validation
         silver_drivers = (
@@ -187,7 +185,7 @@ class SilverProcessing:
         )
         
         # Write to Silver Iceberg table
-        silver_drivers.writeTo("demo.silver.silver_drivers").createOrReplace()
+        silver_drivers.writeTo("silver.silver_drivers").createOrReplace()
         print(f"Processed {silver_drivers.count()} drivers to Silver layer")
 
     def process_silver_restaurants(self):
@@ -195,7 +193,7 @@ class SilverProcessing:
         print("Processing Silver Restaurants...")
         
         # Read from Bronze
-        bronze_restaurants = self.spark.table("demo.bronze.bronze_restaurants")
+        bronze_restaurants = self.spark.table("bronze.bronze_restaurants")
         
         # Data cleaning and validation
         silver_restaurants = (
@@ -220,7 +218,7 @@ class SilverProcessing:
         )
         
         # Write to Silver Iceberg table
-        silver_restaurants.writeTo("demo.silver.silver_restaurants").createOrReplace()
+        silver_restaurants.writeTo("silver.silver_restaurants").createOrReplace()
         print(f"Processed {silver_restaurants.count()} restaurants to Silver layer")
 
     def process_silver_ratings(self):
@@ -228,7 +226,7 @@ class SilverProcessing:
         print("⭐ Processing Silver Ratings...")
         
         # Read from Bronze
-        bronze_ratings = self.spark.table("demo.bronze.bronze_ratings")
+        bronze_ratings = self.spark.table("bronze.bronze_ratings")
         
         # Data cleaning and validation
         silver_ratings = (
@@ -260,7 +258,7 @@ class SilverProcessing:
         )
         
         # Write to Silver Iceberg table
-        silver_ratings.writeTo("demo.silver.silver_ratings").createOrReplace()
+        silver_ratings.writeTo("silver.silver_ratings").createOrReplace()
         print(f"Processed {silver_ratings.count()} ratings to Silver layer")
 
     def process_silver_restaurant_performance(self):
@@ -268,8 +266,8 @@ class SilverProcessing:
         print("Processing Silver Restaurant Performance...")
         
         # Read Silver data
-        silver_orders = self.spark.table("demo.silver.silver_orders")
-        silver_ratings = self.spark.table("demo.silver.silver_ratings")
+        silver_orders = self.spark.table("silver.silver_orders")
+        silver_ratings = self.spark.table("silver.silver_ratings")
         
         # Calculate daily restaurant performance metrics
         restaurant_performance = (
@@ -321,7 +319,7 @@ class SilverProcessing:
         )
         
         # Write to Silver Iceberg table
-        final_performance.writeTo("demo.silver.silver_restaurant_performance").createOrReplace()
+        final_performance.writeTo("silver.silver_restaurant_performance").createOrReplace()
         print(f"Processed {final_performance.count()} restaurant performance records to Silver layer")
 
     def process_silver_driver_performance(self):
@@ -329,8 +327,8 @@ class SilverProcessing:
         print("Processing Silver Driver Performance...")
         
         # Read Silver data
-        silver_orders = self.spark.table("demo.silver.silver_orders")
-        silver_ratings = self.spark.table("demo.silver.silver_ratings")
+        silver_orders = self.spark.table("silver.silver_orders")
+        silver_ratings = self.spark.table("silver.silver_ratings")
         
         # Calculate daily driver performance metrics
         driver_performance = (
@@ -376,7 +374,7 @@ class SilverProcessing:
         )
         
         # Write to Silver Iceberg table
-        final_performance.writeTo("demo.silver.silver_driver_performance").createOrReplace()
+        final_performance.writeTo("silver.silver_driver_performance").createOrReplace()
         print(f"Processed {final_performance.count()} driver performance records to Silver layer")
     
     def process_silver_weather(self):
@@ -384,7 +382,7 @@ class SilverProcessing:
         print("Processing Silver Weather...")
         
         # Read from Bronze
-        bronze_weather = self.spark.table("demo.bronze.bronze_weather")
+        bronze_weather = self.spark.table("bronze.bronze_weather")
         
         # Data cleaning and validation
         silver_weather = (
@@ -408,7 +406,7 @@ class SilverProcessing:
         )
         
         # Write to Silver Iceberg table
-        silver_weather.writeTo("demo.silver.silver_weather").createOrReplace()
+        silver_weather.writeTo("silver.silver_weather").createOrReplace()
         print(f"Processed {silver_weather.count()} weather records to Silver layer")
     
     def run_data_quality_checks(self):
@@ -417,7 +415,7 @@ class SilverProcessing:
         
         try:
             # Check orders data quality
-            orders = self.spark.table("demo.silver.silver_orders")
+            orders = self.spark.table("silver.silver_orders")
             orders_count = orders.count()
             invalid_orders = orders.filter(
                 col("order_id").isNull() | 
@@ -428,7 +426,7 @@ class SilverProcessing:
             print(f"Orders: {orders_count} total, {invalid_orders} invalid")
             
             # Check order items data quality
-            order_items = self.spark.table("demo.silver.silver_order_items")
+            order_items = self.spark.table("silver.silver_order_items")
             items_count = order_items.count()
             invalid_items = order_items.filter(
                 (col("quantity") <= 0) | 
@@ -438,7 +436,7 @@ class SilverProcessing:
             print(f"Order Items: {items_count} total, {invalid_items} invalid")
             
             # Check ratings data quality
-            ratings = self.spark.table("demo.silver.silver_ratings")
+            ratings = self.spark.table("silver.silver_ratings")
             ratings_count = ratings.count()
             invalid_ratings = ratings.filter(
                 (col("driver_rating") < 1.0) | (col("driver_rating") > 5.0) |
@@ -486,7 +484,7 @@ class SilverProcessing:
         print("Processing streaming orders...")
         
         # Read from Bronze streaming orders
-        bronze_orders = self.spark.table("demo.bronze.bronze_orders")
+        bronze_orders = self.spark.table("bronze.bronze_orders")
         
         # Apply Silver transformations for streaming data
         silver_orders = (
@@ -510,7 +508,7 @@ class SilverProcessing:
          .write
          .format("iceberg")
          .mode("append")
-         .saveAsTable("demo.silver.silver_orders"))
+         .saveAsTable("silver.silver_orders"))
         
         print("Streaming orders processed to Silver")
     
@@ -519,7 +517,7 @@ class SilverProcessing:
         print("Processing streaming order items...")
         
         # Read from Bronze streaming order items
-        bronze_order_items = self.spark.table("demo.bronze.bronze_order_items")
+        bronze_order_items = self.spark.table("bronze.bronze_order_items")
         
         # Apply Silver transformations
         silver_order_items = (
@@ -535,7 +533,7 @@ class SilverProcessing:
          .write
          .format("iceberg")
          .mode("append")
-         .saveAsTable("demo.silver.silver_order_items"))
+         .saveAsTable("silver.silver_order_items"))
         
         print("Streaming order items processed to Silver")
     
@@ -544,7 +542,7 @@ class SilverProcessing:
         print("Processing streaming driver locations...")
         
         # Read from Bronze streaming driver locations
-        bronze_locations = self.spark.table("demo.bronze.bronze_driver_locations")
+        bronze_locations = self.spark.table("bronze.bronze_driver_locations")
         
         # Apply Silver transformations
         silver_locations = (
@@ -559,7 +557,7 @@ class SilverProcessing:
          .write
          .format("iceberg")
          .mode("append")
-         .saveAsTable("demo.silver.silver_driver_locations"))
+         .saveAsTable("silver.silver_driver_locations"))
         
         print("Streaming driver locations processed to Silver")
     
@@ -568,7 +566,7 @@ class SilverProcessing:
         print("Processing daily performance from streaming data...")
         
         # Get streaming orders from Silver
-        silver_orders = self.spark.table("demo.silver.silver_orders")
+        silver_orders = self.spark.table("silver.silver_orders")
         
         # Create daily aggregations for streaming data
         daily_performance = (
@@ -596,7 +594,7 @@ class SilverProcessing:
          .write
          .format("iceberg")
          .mode("append")
-         .saveAsTable("demo.silver.daily_performance"))
+         .saveAsTable("silver.daily_performance"))
         
         print("Daily performance processed from streaming data")
     
