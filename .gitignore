@@ -1,43 +1,38 @@
-# Logs and temporary files
+# Logs and runtime data
 orchestration/logs/
 *.log
 
-# Python cache
+# Python artefacts
 __pycache__/
 *.pyc
 *.pyo
 
-# Temporary files
-temp_*.py
-check_schema.py
-
-# Dashboard files (generated)
+# Generated dashboards and local warehouse
 woeat_dashboard.html
-
-# Docker volumes and data
 warehouse/
-spark/
-docs/
 
-# IDE files
+# Temporary scripts
+temp_*.py
+
+# IDE / OS noise
 .vscode/
 .idea/
-
-# OS files
 .DS_Store
 Thumbs.db
 
-# VS Code settings (user-specific)
-.vscode/settings.json
-
-# Demo and presentation files (private - not for teacher)
-*test*
-*Test*
-*TEST*
-
-# Presentation materials
+# Slides / presentations you don't intend to publish
 *.pptx
 *.ppt
 presentation/
 slides/
+
+#Ignore local documentation drafts
 PROJECT_GUIDE.md
+implementation-overview.md
+test_streaming.py
+
+# Tests – ignore only compiled results or specific dirs, not every file with "test" in the name
+#tests/
+#*_test.py
+#test_*.py
+
